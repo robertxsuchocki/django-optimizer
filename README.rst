@@ -1,8 +1,8 @@
-=========
-Optimizer
-=========
+================
+Django Optimizer
+================
 
-Optimizer is a Django app to automatically optimize queries for querysets based on their usage within the project.
+Django Optimizer is a Django app to automatically optimize queries for querysets based on their usage within the project.
 
 Detailed documentation is in the "docs" directory.
 
