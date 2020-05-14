@@ -4,7 +4,7 @@ import os
 import django
 
 
-class AppSettings:
+class DjangoOptimizerSettings:
     """
     Container for settings exclusive for an app, with possibility to replace any in project settings.
     """
@@ -12,11 +12,8 @@ class AppSettings:
         try:
             return getattr(django.conf.settings, item)
         except AttributeError:
-            return super(AppSettings, self).__getattribute__(item)
+            return super(DjangoOptimizerSettings, self).__getattribute__(item)
 
-
-# TODO allow bigger customization (e.g. providing own caching class, which is not FileBasedCache)
-class DjangoOptimizerSettings(AppSettings):
     OPTIMIZER_CACHE_LOCATION = os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
     """
     Location for a file-based cache with tuples of fields gathered and used to optimize queries.
