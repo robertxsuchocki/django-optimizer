@@ -4,7 +4,7 @@ import os
 import django
 
 
-class DjangoOptimizerSettings:
+class DjangoOptimizerSettings(object):
     """
     Container for settings exclusive for an app, with possibility to replace any in project settings.
     """
