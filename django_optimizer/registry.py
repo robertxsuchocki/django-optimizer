@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-from django.core.cache.backends.filebased import FileBasedCache
+import copy
 
-from django_optimizer.cache import PersistentFileBasedCache
+from django.utils.module_loading import import_string
+
 from django_optimizer.conf import settings
 
 
@@ -72,8 +73,11 @@ class QuerySetFieldRegistry:
 
     @staticmethod
     def _get_cache():
-        cache_class = PersistentFileBasedCache if settings.OPTIMIZER_CACHE_PERSISTENT else FileBasedCache
-        return cache_class(settings.OPTIMIZER_CACHE_LOCATION, settings.OPTIMIZER_CACHE_PARAMS)
+        params = copy.deepcopy(settings.OPTIMIZER_CACHE)
+        backend = params.pop('BACKEND')
+        location = params.pop('LOCATION', '')
+        backend_cls = import_string(backend)
+        return backend_cls(location, params)
 
 
 field_registry = QuerySetFieldRegistry()

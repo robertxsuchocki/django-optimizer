@@ -14,32 +14,20 @@ class DjangoOptimizerSettings:
         except AttributeError:
             return super(DjangoOptimizerSettings, self).__getattribute__(item)
 
-    OPTIMIZER_CACHE_LOCATION = os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
+    OPTIMIZER_CACHE = {
+        'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
+        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
+    }
     """
-    Location for a file-based cache with tuples of fields gathered and used to optimize queries.
+    Cache to be used in field registry (which contains tuples of fields gathered and used to optimize queries).
     
-    Can be both relative and absolute path.
-
-    Defaults to ``os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')``.
-    """
-
-    OPTIMIZER_CACHE_PERSISTENT = True
-    """
-    Whether a field cache should be persistent or not.
+    Defaults to PersistentFileBasedCache (FileBasedCache, but with no-ops for functions clearing any keys in cache).
+    Its' default path is equal to ``os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')``.
     
-    If it's persistent, then cache is a django FileBasedCache, but with no-ops for functions clearing any keys in cache.
-    Otherwise it's just a django FileBasedCache, which can then be modified with ``OPTIMIZER_CACHE_PARAMS``
+    Keep in mind that cache shouldn't be eager to remove any entries contained, as they will be reappearing
+    and overwriting constantly. Ideally should disable any overwriting.
     
-    Created to allow FileBased cache usage, but in most cases should not be changed, 
-    as optimizer shouldn't drop any entries.
-    """
-
-    OPTIMIZER_CACHE_PARAMS = {}
-    """
-    Parameters passed to field cache.
-    
-    Note that if ``OPTIMIZER_CACHE_PERSISTENT == True``, then 'timeout', 'max_entries' and 
-    'cull_frequency' won't have effect.
+    If performance issues occur, then it should be dropped in favor of manual in-code optimization (at least partially).
     """
 
 
