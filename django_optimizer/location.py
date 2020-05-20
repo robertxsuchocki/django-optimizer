@@ -61,7 +61,7 @@ class QuerySetLocation:
 
     def get_file(self):
         _, filename, _, _, _, _ = self.source[0]
-        return filename.replace(django_settings.BASE_DIR, '.').replace('.py', '')
+        return filename.replace(django_settings.BASE_DIR + '/', '').replace('.py', '')
 
     def get_scope(self):
         _, filename, _, _, _, _ = self.source[0]
@@ -69,17 +69,7 @@ class QuerySetLocation:
 
     # TODO remove
     def get_variable(self):
-        def __extract_name_from_line(line):
-            for prefix in ['class', 'def']:
-                if prefix in line:
-                    line = line.split(prefix)[-1]
-            for postfix in ['=']:
-                if postfix in line:
-                    line = line.split(postfix)[0]
-            return line.strip()
-
-        _, _, _, _, code_context, index = self.source[0]
-        return __extract_name_from_line(code_context[index])
+        return str(self.source[0][2])
 
     # TODO reconsider & fix
     # def get_variable(self):

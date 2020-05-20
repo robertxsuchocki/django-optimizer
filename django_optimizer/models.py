@@ -19,12 +19,9 @@ class OptimizerQuerySet(models.query.QuerySet):
     def __init__(self, *args, **kwargs):
         """
         Remembers its location, which is set in __init__() function of QuerySetLocation class.
-
-        Also sets initial to True, which states whether queryset should be optimized or not.
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
         self.location = QuerySetLocation(self)
-        self.initial = True
 
     def _populate_data(self):
         """
@@ -51,14 +48,11 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
         and prefetch_related() operations based on registry values and then updates self accordingly.
-
-        Sets initial to False to skip optimization of any consequent querysets.
         """
-        if self.location and self.initial:
+        if self.location:
             fields = field_registry.get(self.location)
             qs = self._prepare_qs(*fields)
             self.__dict__.update(qs.__dict__)
-            self.initial = False
 
     def _fetch_all(self):
         """
@@ -69,20 +63,6 @@ class OptimizerQuerySet(models.query.QuerySet):
         self._optimize()
         super(OptimizerQuerySet, self)._fetch_all()
         self._populate_data()
-
-    def values(self, *fields, **expressions):
-        """
-        Works similarly to _fetch_all, executes _optimize() and proceeds with values()
-        """
-        self._optimize()
-        return super(OptimizerQuerySet, self).values(*fields, **expressions)
-
-    def values_list(self, *fields, **kwargs):
-        """
-        Works similarly to _fetch_all, executes _optimize() and proceeds with values_list()
-        """
-        self._optimize()
-        return super(OptimizerQuerySet, self).values_list(*fields, **kwargs)
 
     def _prepare_qs(self, select, prefetch, only):
         """
@@ -145,6 +125,15 @@ class OptimizerQuerySet(models.query.QuerySet):
         select_fields = self.query.select_related
         if not isinstance(select_fields, bool):
             fields |= set(select_fields.keys())
+
+        # here previous manual only() and defer() invocations are taken into consideration
+        # it's essential to have refresh_from_db() work correctly as it uses only() with own fields and default_manager
+        # lack of it resulted in refresh_from_db() being unable to refetch field deferred by _perform_only
+        initial_fields, defer = self.query.deferred_loading
+        if defer:
+            fields -= initial_fields
+        else:
+            fields |= initial_fields
 
         qs = qs.only(*fields)
 
