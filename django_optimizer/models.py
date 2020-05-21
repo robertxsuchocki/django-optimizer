@@ -1,10 +1,10 @@
 # -*- coding: utf-8 -*-
-import re
-
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 from django.db.models import OneToOneField, OneToOneRel, ForeignKey, ManyToOneRel, ManyToManyField, ManyToManyRel
 
+from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
+    OptimizerFlatValuesListIterable, OptimizerValuesListIterable
 from django_optimizer.location import QuerySetLocation
 from django_optimizer.registry import field_registry
 
@@ -21,38 +21,8 @@ class OptimizerQuerySet(models.query.QuerySet):
         Remembers its location, which is set in __init__() function of QuerySetLocation class.
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
+        self._iterable_class = OptimizerModelIterable
         self.location = QuerySetLocation(self)
-
-    def _populate_data(self):
-        """
-        Passes its data to every model instance for later usage in
-        gathering column data and identifying relevant queryset.
-
-        To be used only after _fetch_all(), it's taken for granted that
-        full queryset is available on self._result_cache variable.
-        """
-        prefetch_lookup_names = [
-            getattr(lookup, 'prefetch_through', str(lookup))
-            for lookup in self._prefetch_related_lookups
-        ]
-
-        for instance in self._result_cache:
-            try:
-                instance.qs_location = self.location
-                instance.prefetch_lookup_names = prefetch_lookup_names
-            except AttributeError:
-                instance['qs_location'] = self.location
-                instance['prefetch_lookup_names'] = prefetch_lookup_names
-
-    def _optimize(self):
-        """
-        Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
-        and prefetch_related() operations based on registry values and then updates self accordingly.
-        """
-        if self.location:
-            fields = field_registry.get(self.location)
-            qs = self._prepare_qs(*fields)
-            self.__dict__.update(qs.__dict__)
 
     def _fetch_all(self):
         """
@@ -62,7 +32,41 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         self._optimize()
         super(OptimizerQuerySet, self)._fetch_all()
-        self._populate_data()
+
+    def values(self, *fields, **expressions):
+        """
+        Calls _optimize() before super, later optimization (before _fetch_all()) will be a noop
+
+        Also uses custom Iterable class, that populates necessary data from QuerySet to Model
+        """
+        self._optimize()
+        clone = super(OptimizerQuerySet, self).values(*fields, **expressions)
+        clone._iterable_class = OptimizerValuesIterable
+        return clone
+
+    def values_list(self, *fields, **kwargs):
+        """
+        Calls _optimize() before super, later optimization (before _fetch_all()) will be a noop
+
+        Also uses custom Iterable class, that populates necessary data from QuerySet to Model
+        """
+        self._optimize()
+        flat = kwargs.get('flat', False)
+        clone = super(OptimizerQuerySet, self).values_list(*fields, **kwargs)
+        clone._iterable_class = OptimizerFlatValuesListIterable if flat else OptimizerValuesListIterable
+        return clone
+
+    def _optimize(self):
+        """
+        Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
+        and prefetch_related() operations based on registry values and then updates self accordingly.
+        """
+        # all of those functions doesn't make sense if object is outside of QuerySet and values(_list) has been called
+        # in case of values(_list), _optimize will be manually called before them and skipped later
+        if self.location and self._fields is None:
+            fields = field_registry.get(self.location)
+            qs = self._prepare_qs(*fields)
+            self.__dict__.update(qs.__dict__)
 
     def _prepare_qs(self, select, prefetch, only):
         """
@@ -79,11 +83,6 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _perform_select_related(self, fields):
         qs = self
-
-        # select_related() cannot be called after values() or values_list()
-        # this select_related() will be made after values(_list)() and then skipped
-        if self._fields is not None:
-            return qs
 
         # if user deliberately wants to select all fields, then it shouldn't be optimized
         if self.query.select_related is True:
@@ -109,11 +108,6 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _perform_only(self, fields):
         qs = self
-
-        # only() cannot be called after values() or values_list()
-        # this only() will be made after values(_list)() and then skipped
-        if self._fields is not None:
-            return qs
 
         # only() without arguments acts like no-op, in this case no data should be retrieved
         # setting it to the list containing only 'id' seems to be a reasonable minimum
@@ -145,12 +139,10 @@ class OptimizerModel(models.Model):
         abstract = True
 
     def __init__(self, *args, **kwargs):
-        self.qs_location = ''
-        self.prefetch_lookup_names = None
         super(OptimizerModel, self).__init__(*args, **kwargs)
 
     def __getattribute__(self, item):
-        if item != '_meta' and item in [f.name for f in self._meta.get_fields()]:
+        if item != '_meta':
             try:
                 field = self._meta.get_field(item)
                 self._add_select_field(field)
@@ -161,19 +153,21 @@ class OptimizerModel(models.Model):
 
     def _add_select_field(self, field):
         select_fields = [OneToOneField, OneToOneRel, ForeignKey]
+        has_qs = hasattr(self, '_qs_location')
         is_instance = any(isinstance(field, select) for select in select_fields)
         no_cache = not hasattr(self, field.get_cache_name())
-        if is_instance and no_cache:
-            field_registry.set_select(self.qs_location, [field.name])
+        if has_qs and is_instance and no_cache:
+            field_registry.set_select(self._qs_location, field.name)
 
     def _add_prefetch_field(self, field):
         prefetch_fields = [ManyToOneRel, ManyToManyField, ManyToManyRel]
+        has_qs = hasattr(self, '_qs_location')
         is_instance = any(isinstance(field, prefetch) for prefetch in prefetch_fields)
-        no_name = self.prefetch_lookup_names is not None and field.name not in self.prefetch_lookup_names
-        if is_instance and no_name:
-            field_registry.set_prefetch(self.qs_location, [field.name])
+        no_name = hasattr(self, '_prefetch_lookup_names') and field.name not in self._prefetch_lookup_names
+        if has_qs and is_instance and no_name:
+            field_registry.set_prefetch(self._qs_location, field.name)
 
     def refresh_from_db(self, using=None, fields=None):
         if fields:
-            field_registry.set_only(self.qs_location, fields)
+            field_registry.set_only(self._qs_location, *fields)
         super(OptimizerModel, self).refresh_from_db(using, fields)
