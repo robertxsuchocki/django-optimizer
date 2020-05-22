@@ -1,6 +1,7 @@
+# -*- coding: utf-8 -*-
 from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
 
-from django_optimizer.location import QuerySetLocation
+from django_optimizer.location import ObjectLocation
 
 
 class OptimizerIterable(object):
@@ -12,7 +13,7 @@ class OptimizerIterable(object):
     """
     def __iter__(self):
         qs = self.queryset
-        location = QuerySetLocation(qs)
+        location = ObjectLocation(qs.model.__name__)
         prefetch_lookup_names = [
             getattr(lookup, 'prefetch_through', str(lookup))
             for lookup in qs._prefetch_related_lookups

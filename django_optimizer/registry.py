@@ -28,7 +28,7 @@ class QuerySetFieldRegistry:
 
         If cache didn't have this value, initializes it with tuple of 3 empty sets.
 
-        :param qs_location: QuerySetLocation object defining cache key
+        :param qs_location: queryset's ObjectLocation object defining cache key
         :return: tuple of 3 sets of field names
         """
         key = str(qs_location)
@@ -51,7 +51,7 @@ class QuerySetFieldRegistry:
 
         Retrieves value from cache based on location object, appends one set and writes value back.
 
-        :param qs_location: QuerySetLocation object defining cache key
+        :param qs_location: queryset's ObjectLocation object defining cache key
         :param values: set of field names to be inserted to one of the sets
         :param index: index of a set to append
         :return:

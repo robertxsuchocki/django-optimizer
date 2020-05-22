@@ -1,11 +1,15 @@
 # -*- coding: utf-8 -*-
-from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
 from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
     OptimizerFlatValuesListIterable, OptimizerValuesListIterable
-from django_optimizer.location import QuerySetLocation
+from django_optimizer.base import OptimizerModel
+from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
+
+__all__ = [
+    'OptimizerQuerySet', 'OptimizerModel'
+]
 
 
 class OptimizerQuerySet(models.query.QuerySet):
@@ -17,11 +21,11 @@ class OptimizerQuerySet(models.query.QuerySet):
     """
     def __init__(self, *args, **kwargs):
         """
-        Remembers its location, which is set in __init__() function of QuerySetLocation class.
+        Remembers its location, which is set in __init__() function of ObjectLocation class.
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
         self._iterable_class = OptimizerModelIterable
-        self.location = QuerySetLocation(self)
+        self.location = ObjectLocation(self.model.__name__)
 
     def _fetch_all(self):
         """
@@ -131,43 +135,3 @@ class OptimizerQuerySet(models.query.QuerySet):
         qs = qs.only(*fields)
 
         return qs
-
-
-class OptimizerModel(models.Model):
-    class Meta:
-        abstract = True
-
-    def __init__(self, *args, **kwargs):
-        super(OptimizerModel, self).__init__(*args, **kwargs)
-
-    def __getattribute__(self, item):
-        if item != '_meta':
-            try:
-                field = self._meta.get_field(item)
-                is_relation = field.is_relation
-                is_field_colname = isinstance(field, models.Field) and item == field.get_attname()
-                if is_relation and not is_field_colname:
-                    self._add_select_field(field)
-                    self._add_prefetch_field(field)
-            except FieldDoesNotExist:
-                pass
-        return super(OptimizerModel, self).__getattribute__(item)
-
-    def _add_select_field(self, field):
-        has_qs = hasattr(self, '_qs_location')
-        to_one = field.one_to_one or field.many_to_one
-        no_cache = not hasattr(self, field.get_cache_name())
-        if has_qs and to_one and no_cache:
-            field_registry.set_select(self._qs_location, field.name)
-
-    def _add_prefetch_field(self, field):
-        has_qs = hasattr(self, '_qs_location')
-        to_many = field.one_to_many or field.many_to_many
-        no_name = hasattr(self, '_prefetch_lookup_names') and field.name not in self._prefetch_lookup_names
-        if has_qs and to_many and no_name:
-            field_registry.set_prefetch(self._qs_location, field.name)
-
-    def refresh_from_db(self, using=None, fields=None):
-        if fields:
-            field_registry.set_only(self._qs_location, *fields)
-        super(OptimizerModel, self).refresh_from_db(using, fields)

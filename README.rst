@@ -20,12 +20,30 @@ Quick start
         'django-optimizer',
     ]
 
-3. To enable logging of a model or queryset, add LoggingModelMixin or LoggingQuerySetMixin to its definition, like this::
+3. By default, optimizer uses file-based cache to store data needed in query optimization. To change location or type of this cache, define `OPTIMIZER_CACHE` variable in your project's settings like this (variable fields are equivalent to django's `CACHES` variable) ::
 
-    class CustomModel(models.Model, LoggingModelMixin):
+    # These are default settings, using persistent version of file-based django cache and
+    # storing this cache in `.django-optimizer-cache` subdirectory of your project
+    OPTIMIZER_CACHE = {
+        'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
+        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
+    }
+
+4. For default cache settings, add this line to `.gitignore` file to disable tracking of cache files ::
+
+    # django-optimizer's cache files
+    .django-optimizer-cache/
+
+5. To enable optimization of a model and queryset, add OptimizerModel and OptimizerQuerySet to its definition, like this::
+
+    from django_optimizer.query import OptimizerQuerySet, OptimizerModel
 
 
-    class CustomQuerySet(models.query.QuerySet, LoggingQuerySetMixin):
+    class CustomQuerySet(models.query.QuerySet, OptimizerQuerySet):
+        (...)
+
+    class CustomModel(models.Model, OptimizerModel):
+        (...)
 
 
 

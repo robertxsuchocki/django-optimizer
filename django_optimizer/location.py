@@ -4,37 +4,37 @@ import inspect
 from django.conf import settings as django_settings
 
 
-class QuerySetLocation:
+class ObjectLocation:
     """
-    Object for storing information about queryset location.
+    Class for storing information about object location.
     """
-    def __init__(self, qs):
+    def __init__(self, name):
         """
-        Gets values from queryset (model name) and source code stack frames
-        (file name, function names, variable name) to differentiate between different querysets.
+        Gets values from source code stack frames (file name, function names)
+        and passed name to differentiate between different objects.
 
-        :param qs: QuerySet object, which location is stored by this object
+        :param name: string indicating a type or name for a located object
         """
         self.source = self.get_source()
         if self.source:
-            self.type = self.get_type(qs)
             self.file = self.get_file()
             self.scope = self.get_scope()
+            self.name = self.get_name(name)
 
     def __str__(self):
         """
         Joins all fields retrieved in __init__().
 
-        :return: string representation, unique key to be used in caching field sets
+        :return: string representation, uniqueness wrt filename, execution scope and passed name
         """
         if self.source:
-            return '/'.join([self.type, self.file, self.scope])
+            return '/'.join([self.file, self.scope, self.name])
         else:
             return ''
 
     def __bool__(self):
         """
-        Tells optimizer whether queryset has any reasonable location in source code and whether it should be optimized.
+        Tells whether object has any reasonable location in project source code.
 
         :return: True if there are any source code stack frames
         """
@@ -54,10 +54,6 @@ class QuerySetLocation:
         except IndexError:
             return []
 
-    @staticmethod
-    def get_type(obj):
-        return obj.model.__name__.lower()
-
     def get_file(self):
         _, filename, _, _, _, _ = self.source[0]
         return filename.replace(django_settings.BASE_DIR + '/', '').replace('.py', '')
@@ -65,3 +61,7 @@ class QuerySetLocation:
     def get_scope(self):
         _, filename, _, _, _, _ = self.source[0]
         return '.'.join(reversed([str(s[3]) for s in self.source if s[1] == filename]))
+
+    @staticmethod
+    def get_name(name):
+        return str(name).lower()
