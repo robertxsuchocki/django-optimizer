@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
-from django.db.models import OneToOneField, OneToOneRel, ForeignKey, ManyToOneRel, ManyToManyField, ManyToManyRel
 
 from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
     OptimizerFlatValuesListIterable, OptimizerValuesListIterable
@@ -145,26 +144,27 @@ class OptimizerModel(models.Model):
         if item != '_meta':
             try:
                 field = self._meta.get_field(item)
-                self._add_select_field(field)
-                self._add_prefetch_field(field)
+                is_relation = field.is_relation
+                is_field_colname = isinstance(field, models.Field) and item == field.get_attname()
+                if is_relation and not is_field_colname:
+                    self._add_select_field(field)
+                    self._add_prefetch_field(field)
             except FieldDoesNotExist:
                 pass
         return super(OptimizerModel, self).__getattribute__(item)
 
     def _add_select_field(self, field):
-        select_fields = [OneToOneField, OneToOneRel, ForeignKey]
         has_qs = hasattr(self, '_qs_location')
-        is_instance = any(isinstance(field, select) for select in select_fields)
+        to_one = field.one_to_one or field.many_to_one
         no_cache = not hasattr(self, field.get_cache_name())
-        if has_qs and is_instance and no_cache:
+        if has_qs and to_one and no_cache:
             field_registry.set_select(self._qs_location, field.name)
 
     def _add_prefetch_field(self, field):
-        prefetch_fields = [ManyToOneRel, ManyToManyField, ManyToManyRel]
         has_qs = hasattr(self, '_qs_location')
-        is_instance = any(isinstance(field, prefetch) for prefetch in prefetch_fields)
+        to_many = field.one_to_many or field.many_to_many
         no_name = hasattr(self, '_prefetch_lookup_names') and field.name not in self._prefetch_lookup_names
-        if has_qs and is_instance and no_name:
+        if has_qs and to_many and no_name:
             field_registry.set_prefetch(self._qs_location, field.name)
 
     def refresh_from_db(self, using=None, fields=None):
