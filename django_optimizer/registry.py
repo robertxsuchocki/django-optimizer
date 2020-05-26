@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
+import ast
 import copy
+import csv
 
 from django.utils.module_loading import import_string
 
@@ -16,11 +18,33 @@ class QuerySetFieldRegistry:
     PREFETCH = 1
     ONLY = 2
 
+    KEY_SET = '__django_optimizer_key_set'
+
     def __init__(self):
         """
         Gets PersistentFileBasedCache with field sets (or FileBasedCache with custom options if stated in settings).
         """
         self.cache = self._get_cache()
+
+    def add_key(self, key):
+        """
+        Adds a key name to separate cache field.
+
+        :param key: key to be added
+        """
+        key_set = self.get_keys()
+        key_set.add(key)
+        self.cache.set(self.KEY_SET, key_set)
+
+    def get_keys(self):
+        """
+        Gets all names of keys that has been added.
+
+        They are later used on saving cache to csv as most caches don't have a way of getting all pairs.
+
+        :return: set of key names
+        """
+        return self.cache.get(self.KEY_SET) or set()
 
     def get(self, qs_location):
         """
@@ -43,6 +67,7 @@ class QuerySetFieldRegistry:
         """
         value = set(), set(), set()
         self.cache.set(key, value)
+        self.add_key(key)
         return value
 
     def _append_tuple(self, qs_location, index, *args):
@@ -79,6 +104,23 @@ class QuerySetFieldRegistry:
         location = params.pop('LOCATION', '')
         backend_cls = import_string(backend)
         return backend_cls(location, params)
+
+    def from_csv(self, filepath, clear=True):
+        if clear:
+            self.cache.clear()
+        with open(filepath) as csv_file:
+            reader = csv.reader(csv_file, delimiter=',')
+            for row in reader:
+                select, prefetch, only = [ast.literal_eval(r) for r in row[1:]]
+                self.add_key(row[0])
+                self.cache.set(row[0], (set(select), set(prefetch), set(only)))
+
+    def to_csv(self, filepath):
+        with open(filepath, mode='w') as csv_file:
+            writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
+            for key in sorted(self.get_keys()):
+                tup = self.get(key)
+                writer.writerow([key, list(tup[0]), list(tup[1]), list(tup[2])])
 
 
 field_registry = QuerySetFieldRegistry()

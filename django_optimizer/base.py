@@ -9,9 +9,6 @@ class OptimizerModel(models.Model):
     class Meta:
         abstract = True
 
-    def __init__(self, *args, **kwargs):
-        super(OptimizerModel, self).__init__(*args, **kwargs)
-
     def __getattribute__(self, item):
         if item not in ['_meta', '__dict__']:
             try:
