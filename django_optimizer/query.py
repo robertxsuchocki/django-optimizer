@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 from django.db import models
+from django.db.models import Prefetch
 
 from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
     OptimizerFlatValuesListIterable, OptimizerValuesListIterable
@@ -24,8 +25,8 @@ class OptimizerQuerySet(models.query.QuerySet):
         Remembers its location, which is set in __init__() function of ObjectLocation class.
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
+        self._location = ObjectLocation(self.model.__name__)
         self._iterable_class = OptimizerModelIterable
-        self.location = ObjectLocation(self.model.__name__)
 
     def _fetch_all(self):
         """
@@ -66,8 +67,8 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         # all of those functions doesn't make sense if object is outside of QuerySet and values(_list) has been called
         # in case of values(_list), _optimize will be manually called before them and skipped later
-        if self.location and self._fields is None:
-            fields = field_registry.get(self.location)
+        if self._location and self._fields is None:
+            fields = field_registry.get(self._location)
             qs = self._prepare_qs(*fields)
             self.__dict__.update(qs.__dict__)
 
@@ -100,12 +101,23 @@ class OptimizerQuerySet(models.query.QuerySet):
         return qs
 
     def _perform_prefetch_related(self, fields):
+        from django_optimizer.wrappers import optimizer_query_set_wrapper
+
         qs = self
 
-        # passing empty list won't invalidate previous prefetch_related() calls
-        # it's here only because prefetch_related() with empty fields might crash in old versions of django
-        if fields:
-            qs = qs.prefetch_related(*fields)
+        # for all labels Prefetch object gets created with dynamically mixined queryset
+        # used to enable optimization of these querysets in prefetch objects
+        # without field queryset being declared as optimized in models
+        for label in fields:
+            prefetch_lookups = [
+                getattr(lookup, 'prefetch_through', str(lookup)) for lookup in self._prefetch_related_lookups
+            ]
+            if label not in prefetch_lookups:
+                field = self.model._meta.get_field(label)
+                model = field.model if self.model != field.model else field.related_model
+                queryset = optimizer_query_set_wrapper(model)
+                prefetch_obj = Prefetch(field.name, queryset=queryset)
+                qs = qs.prefetch_related(prefetch_obj)
 
         return qs
 
