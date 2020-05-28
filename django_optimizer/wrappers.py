@@ -1,5 +1,5 @@
 # -*- coding: utf-8 -*-
-from django_optimizer.base import OptimizerModel
+from django_optimizer.base import LoggingModel
 from django_optimizer.iterables import OptimizerModelIterable
 from django_optimizer.location import ObjectLocation
 from django_optimizer.query import OptimizerQuerySet
@@ -22,11 +22,11 @@ def optimizer_query_set_wrapper(model):
     return queryset
 
 
-def optimizer_model_wrapper(model):
-    if not isinstance(model, OptimizerModel) and not isinstance(model, dict):
+def logging_model_wrapper(model):
+    if not isinstance(model, LoggingModel) and not isinstance(model, dict):
         model.__class__ = type(
             'DjangoOptimizer' + type(model).__name__,
-            (OptimizerModel, type(model)),
+            (LoggingModel, type(model)),
             {
                 '__module__': model.__module__
             }

@@ -5,7 +5,7 @@ from django.db import models
 from django_optimizer.registry import field_registry
 
 
-class OptimizerModel(models.Model):
+class LoggingModel(models.Model):
     class Meta:
         abstract = True
 
@@ -20,7 +20,7 @@ class OptimizerModel(models.Model):
                     self._add_prefetch_field(field)
             except FieldDoesNotExist:
                 pass
-        return super(OptimizerModel, self).__getattribute__(item)
+        return super(LoggingModel, self).__getattribute__(item)
 
     def _add_select_field(self, field):
         has_qs = hasattr(self, '_qs_location')
@@ -40,4 +40,4 @@ class OptimizerModel(models.Model):
         missing_fields = [field for field in fields if not hasattr(self.__dict__, field)]
         if missing_fields:
             field_registry.set_only(self._qs_location, *missing_fields)
-        super(OptimizerModel, self).refresh_from_db(using, fields)
+        super(LoggingModel, self).refresh_from_db(using, fields)

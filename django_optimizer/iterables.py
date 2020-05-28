@@ -12,7 +12,7 @@ class OptimizerIterable(object):
     Needs to be added to every Iterable class to make sure every object has these attributes
     """
     def __iter__(self):
-        from django_optimizer.wrappers import optimizer_model_wrapper
+        from django_optimizer.wrappers import logging_model_wrapper
 
         qs = self.queryset
         location = getattr(qs, '_location', ObjectLocation(qs.model.__name__))
@@ -28,7 +28,7 @@ class OptimizerIterable(object):
             except AttributeError:
                 obj['_qs_location'] = location
                 obj['_prefetch_lookup_names'] = prefetch_lookup_names
-            yield optimizer_model_wrapper(obj)
+            yield logging_model_wrapper(obj)
 
 
 class OptimizerModelIterable(OptimizerIterable, ModelIterable):

@@ -34,15 +34,15 @@ Quick start
     # django-optimizer's cache files
     .django-optimizer-cache/
 
-5. To enable optimization of a model and queryset, add OptimizerModel and OptimizerQuerySet to its definition, like this::
+5. To enable optimization of a model and queryset, add LoggingModel and OptimizerQuerySet to its definition, like this::
 
-    from django_optimizer.query import OptimizerQuerySet, OptimizerModel
+    from django_optimizer.query import OptimizerQuerySet, LoggingModel
 
 
     class CustomQuerySet(models.query.QuerySet, OptimizerQuerySet):
         (...)
 
-    class CustomModel(models.Model, OptimizerModel):
+    class CustomModel(models.Model, LoggingModel):
         (...)
 
 
