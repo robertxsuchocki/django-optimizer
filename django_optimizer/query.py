@@ -4,13 +4,8 @@ from django.db.models import Prefetch
 
 from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
     OptimizerFlatValuesListIterable, OptimizerValuesListIterable
-from django_optimizer.base import LoggingModel
 from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
-
-__all__ = [
-    'OptimizerQuerySet', 'LoggingModel'
-]
 
 
 class OptimizerQuerySet(models.query.QuerySet):
