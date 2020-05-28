@@ -66,8 +66,9 @@ class OptimizerQuerySet(models.query.QuerySet):
         and prefetch_related() operations based on registry values and then updates self accordingly.
         """
         # all of those functions doesn't make sense if object is outside of QuerySet and values(_list) has been called
+        # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
         # in case of values(_list), _optimize will be manually called before them and skipped later
-        if self._location and self._fields is None:
+        if self._location and self._result_cache is None and self._fields is None:
             fields = field_registry.get(self._location)
             qs = self._prepare_qs(*fields)
             self.__dict__.update(qs.__dict__)
