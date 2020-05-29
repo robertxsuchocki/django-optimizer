@@ -5,7 +5,7 @@ from django_optimizer.conf import settings
 from django_optimizer.location import ObjectLocation
 
 
-class OptimizerIterable(object):
+class LoggingIterable(object):
     """
     Passes queryset data to every model instance for later usage in
     gathering column data and identifying relevant queryset.
@@ -22,7 +22,7 @@ class OptimizerIterable(object):
             for lookup in qs._prefetch_related_lookups
         ]
 
-        for obj in super(OptimizerIterable, self).__iter__():
+        for obj in super(LoggingIterable, self).__iter__():
             if settings.DJANGO_OPTIMIZER_DISABLE_LOGGING:
                 yield obj
             else:
@@ -35,17 +35,17 @@ class OptimizerIterable(object):
                 yield logging_model_wrapper(obj)
 
 
-class OptimizerModelIterable(OptimizerIterable, ModelIterable):
+class LoggingModelIterable(LoggingIterable, ModelIterable):
     pass
 
 
-class OptimizerValuesIterable(OptimizerIterable, ValuesIterable):
+class LoggingValuesIterable(LoggingIterable, ValuesIterable):
     pass
 
 
-class OptimizerValuesListIterable(OptimizerIterable, ValuesListIterable):
+class LoggingValuesListIterable(LoggingIterable, ValuesListIterable):
     pass
 
 
-class OptimizerFlatValuesListIterable(OptimizerIterable, FlatValuesListIterable):
+class LoggingFlatValuesListIterable(LoggingIterable, FlatValuesListIterable):
     pass

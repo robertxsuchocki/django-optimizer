@@ -4,7 +4,7 @@ import types
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
 
-from django_optimizer.iterables import OptimizerModelIterable
+from django_optimizer.iterables import LoggingModelIterable
 from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
 from django_optimizer.query import OptimizerQuerySet
@@ -21,7 +21,7 @@ def optimizer_query_set_wrapper(model):
         )
         # __init__ instructions have to be run explicitly
         queryset._location = ObjectLocation(queryset.model.__name__)
-        queryset._iterable_class = OptimizerModelIterable
+        queryset._iterable_class = LoggingModelIterable
 
     return queryset
 

@@ -3,8 +3,8 @@ from django.db import models
 from django.db.models import Prefetch
 
 from django_optimizer.conf import settings
-from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
-    OptimizerFlatValuesListIterable, OptimizerValuesListIterable
+from django_optimizer.iterables import LoggingModelIterable, LoggingValuesIterable, \
+    LoggingFlatValuesListIterable, LoggingValuesListIterable
 from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
 
@@ -23,7 +23,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
         self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
         self._location = ObjectLocation(self.model.__name__)
-        self._iterable_class = OptimizerModelIterable
+        self._iterable_class = LoggingModelIterable
 
     def _fetch_all(self):
         """
@@ -42,7 +42,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         self._optimize()
         clone = super(OptimizerQuerySet, self).values(*fields, **expressions)
-        clone._iterable_class = OptimizerValuesIterable
+        clone._iterable_class = LoggingValuesIterable
         return clone
 
     def values_list(self, *fields, **kwargs):
@@ -54,7 +54,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         self._optimize()
         flat = kwargs.get('flat', False)
         clone = super(OptimizerQuerySet, self).values_list(*fields, **kwargs)
-        clone._iterable_class = OptimizerFlatValuesListIterable if flat else OptimizerValuesListIterable
+        clone._iterable_class = LoggingFlatValuesListIterable if flat else LoggingValuesListIterable
         return clone
 
     def _optimize(self):
