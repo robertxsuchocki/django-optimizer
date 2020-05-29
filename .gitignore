@@ -16,6 +16,7 @@ media
 # Distribution / packaging 
 .Python build/
 develop-eggs/
+demo/
 dist/
 downloads/
 eggs/
@@ -84,4 +85,7 @@ GitHub.sublime-settings
 
 # PyCharm
 .idea/
+
+# sphinx
+docs/_build/
 

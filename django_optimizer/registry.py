@@ -1,4 +1,10 @@
 # -*- coding: utf-8 -*-
+"""
+Registry module
+
+Contains a definition of a QuerySetFieldRegistry - object containing information
+about field names required to optimize querysets
+"""
 import ast
 import copy
 import csv
@@ -10,9 +16,9 @@ from django_optimizer.conf import settings
 
 class QuerySetFieldRegistry:
     """
-    Wrapper for a filebased cache for storing field sets used to optimize querysets.
+    Wrapper for a filebased cache for storing field sets used to optimize querysets
 
-    Holds 3 different sets containing names of fields to be passed to only(), select_related() and prefetch_related().
+    Holds 3 different sets containing names of fields to be passed to only(), select_related() and prefetch_related()
     """
     SELECT = 0
     PREFETCH = 1
@@ -22,13 +28,13 @@ class QuerySetFieldRegistry:
 
     def __init__(self):
         """
-        Gets PersistentFileBasedCache with field sets (or FileBasedCache with custom options if stated in settings).
+        Gets PersistentFileBasedCache with field sets (or FileBasedCache with custom options if stated in settings)
         """
         self.cache = self._get_cache()
 
     def add_key(self, key):
         """
-        Adds a key name to separate cache field.
+        Adds a key name to separate cache field
 
         :param key: key to be added
         """
@@ -38,9 +44,9 @@ class QuerySetFieldRegistry:
 
     def get_keys(self):
         """
-        Gets all names of keys that has been added.
+        Gets all names of keys that has been added
 
-        They are later used on saving cache to csv as most caches don't have a way of getting all pairs.
+        They are later used on saving cache to csv as most caches don't have a way of getting all pairs
 
         :return: set of key names
         """
@@ -48,9 +54,9 @@ class QuerySetFieldRegistry:
 
     def get(self, qs_location):
         """
-        Gets value from cache and returns it.
+        Gets value from cache and returns it
 
-        If cache didn't have this value, initializes it with tuple of 3 empty sets.
+        If cache didn't have this value, initializes it with tuple of 3 empty sets
 
         :param qs_location: queryset's ObjectLocation object defining cache key
         :return: tuple of 3 sets of field names
@@ -60,7 +66,7 @@ class QuerySetFieldRegistry:
 
     def _get_init_value(self, key):
         """
-        Sets value of key in cache to initial value, then returns it.
+        Sets value of key in cache to initial value, then returns it
 
         :param key: key in cache to initialize
         :return: init value
@@ -72,9 +78,9 @@ class QuerySetFieldRegistry:
 
     def _append_tuple(self, qs_location, index, *args):
         """
-        Core function to add field names to registry's queryset entry.
+        Core function to add field names to registry's queryset entry
 
-        Retrieves value from cache based on location object, appends one set and writes value back.
+        Retrieves value from cache based on location object, appends one set and writes value back
 
         :param qs_location: queryset's ObjectLocation object defining cache key
         :param values: set of field names to be inserted to one of the sets
@@ -99,6 +105,11 @@ class QuerySetFieldRegistry:
 
     @staticmethod
     def _get_cache():
+        """
+        Instantiates cache object based on project settings
+
+        :return: cache object for registry
+        """
         params = copy.deepcopy(settings.DJANGO_OPTIMIZER_CACHE)
         backend = params.pop('BACKEND')
         location = params.pop('LOCATION', '')
@@ -106,6 +117,12 @@ class QuerySetFieldRegistry:
         return backend_cls(location, params)
 
     def from_csv(self, filepath, clear=True):
+        """
+        Reads file contents from file and initializes registry's cache
+
+        :param filepath: file to read from
+        :param clear: whether cache should be cleared before operation
+        """
         if clear:
             self.cache.clear()
         with open(filepath) as csv_file:
@@ -116,6 +133,11 @@ class QuerySetFieldRegistry:
                 self.cache.set(row[0], (set(select), set(prefetch), set(only)))
 
     def to_csv(self, filepath):
+        """
+        Dumps cache contents to csv file
+
+        :param filepath: file to write to
+        """
         with open(filepath, mode='w') as csv_file:
             writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for key in sorted(self.get_keys()):

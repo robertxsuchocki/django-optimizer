@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Query module - OptimizerQuerySet definition
+"""
 from django.db import models
 from django.db.models import Prefetch
 
@@ -11,14 +14,14 @@ from django_optimizer.registry import field_registry
 
 class OptimizerQuerySet(models.query.QuerySet):
     """
-    QuerySet objects that optimizes its queries based on maintained register holding sets of field names.
+    QuerySet objects that optimizes its queries based on maintained register holding sets of field names
 
     Based on these field names, object automatically performs only(), select_related() and prefetch_related()
-    just before database query execution to optimize a query without programmer's work.
+    just before database query execution to optimize a query without programmer's work
     """
     def __init__(self, *args, **kwargs):
         """
-        Remembers its location, which is set in __init__() function of ObjectLocation class.
+        Remembers its location, which is set in __init__() function of ObjectLocation class
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
         self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
@@ -29,7 +32,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         First optimizes queryset with usage of _optimize()
 
-        Later proceeds to default _fetch_all() (which is responsible for retrieval of values from db).
+        Later proceeds to default _fetch_all() (which is responsible for retrieval of values from db)
         """
         self._optimize()
         super(OptimizerQuerySet, self)._fetch_all()
@@ -60,7 +63,7 @@ class OptimizerQuerySet(models.query.QuerySet):
     def _optimize(self):
         """
         Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
-        and prefetch_related() operations based on registry values and then updates self accordingly.
+        and prefetch_related() operations based on registry values and then updates self accordingly
         """
         # should be a noop if optimization is turned off or object is outside of QuerySet
         # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
@@ -72,9 +75,9 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _prepare_qs(self, select, prefetch, only):
         """
-        Runs only(), select_related() and prefetch_related() on self, based on parameters and returns the result.
+        Runs only(), select_related() and prefetch_related() on self, based on parameters and returns the result
 
-        Only needs to be last, because it needs to know full list of select_related() fields.
+        Only needs to be last, because it needs to know full list of select_related() fields
 
         :param only: field names to use with only()
         :param select: field names to use with select_related()

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Monkey patching module needed to overload logging model instance's __getattribute__ method
+"""
 from django.db import models
 
 

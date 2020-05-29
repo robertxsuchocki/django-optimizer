@@ -1,4 +1,8 @@
 # -*- coding: utf-8 -*-
+"""
+Iterables module containing iterables objects that are later used by
+OptimizerQuerySet objects to enable logging from fetched objects
+"""
 from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
 
 from django_optimizer.conf import settings
@@ -8,7 +12,7 @@ from django_optimizer.location import ObjectLocation
 class LoggingIterable(object):
     """
     Passes queryset data to every model instance for later usage in
-    gathering column data and identifying relevant queryset.
+    gathering column data and identifying relevant queryset
 
     Needs to be added to every Iterable class to make sure every object has these attributes
     """

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Wrappers module contains wrappers to both django object instances modified by an application
+"""
 import types
 
 from django.core.exceptions import FieldDoesNotExist
@@ -11,6 +14,12 @@ from django_optimizer.query import OptimizerQuerySet
 
 
 def optimizer_query_set_wrapper(model):
+    """
+    Adds OptimizerQuerySet mixin to queryset instance and modifies queryset objects behaviour
+
+    :param model: model instance which specifies created queryset instance
+    :return: wrapped queryset object
+    """
     queryset = model.objects.all()
 
     if not isinstance(queryset, OptimizerQuerySet):
@@ -27,6 +36,12 @@ def optimizer_query_set_wrapper(model):
 
 
 def logging_model_wrapper(model):
+    """
+    Adds modified `__getattribute__` and `refresh_from_db` definitions to model instance
+
+    :param model: input model instance
+    :return: wrapped object
+    """
     def _add_select_field(obj, field_obj):
         has_qs = hasattr(obj, '_qs_location')
         to_one = field_obj.one_to_one or field_obj.many_to_one

@@ -1,4 +1,7 @@
 # -*- coding: utf-8 -*-
+"""
+Location module containing ObjectLocation definition
+"""
 import inspect
 
 from django.conf import settings as django_settings
@@ -6,12 +9,12 @@ from django.conf import settings as django_settings
 
 class ObjectLocation:
     """
-    Class for storing information about object location.
+    Class for storing information about object location
     """
     def __init__(self, name):
         """
         Gets values from source code stack frames (file name, function names)
-        and passed name to differentiate between different objects.
+        and passed name to differentiate between different objects
 
         :param name: string indicating a type or name for a located object
         """
@@ -23,7 +26,7 @@ class ObjectLocation:
 
     def __str__(self):
         """
-        Joins all fields retrieved in __init__().
+        Joins all fields retrieved in __init__()
 
         :return: string representation, uniqueness wrt filename, execution scope and passed name
         """
@@ -34,7 +37,7 @@ class ObjectLocation:
 
     def __bool__(self):
         """
-        Tells whether object has any reasonable location in project source code.
+        Tells whether object has any reasonable location in project source code
 
         :return: True if there are any source code stack frames
         """
@@ -44,7 +47,7 @@ class ObjectLocation:
     def get_source():
         """
         Gets full stack, then ignores frames executing libraries' code and frames executing code
-        from a file different to last source code frame.
+        from a file different to last source code frame
 
         :return: list of frame objects that execute latest file of source code existing on traceback
         """
