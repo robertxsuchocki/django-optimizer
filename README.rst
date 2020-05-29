@@ -20,11 +20,11 @@ Quick start
         'django-optimizer',
     ]
 
-3. By default, optimizer uses file-based cache to store data needed in query optimization. To change location or type of this cache, define `OPTIMIZER_CACHE` variable in your project's settings like this (variable fields are equivalent to django's `CACHES` variable) ::
+3. By default, optimizer uses file-based cache to store data needed in query optimization. To change location or type of this cache, define `DJANGO_OPTIMIZER_CACHE` variable in your project's settings like this (variable fields are equivalent to django's `CACHES` variable) ::
 
     # These are default settings, using persistent version of file-based django cache and
     # storing this cache in `.django-optimizer-cache` subdirectory of your project
-    OPTIMIZER_CACHE = {
+    DJANGO_OPTIMIZER_CACHE = {
         'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
         'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
     }

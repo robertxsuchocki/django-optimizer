@@ -99,7 +99,7 @@ class QuerySetFieldRegistry:
 
     @staticmethod
     def _get_cache():
-        params = copy.deepcopy(settings.OPTIMIZER_CACHE)
+        params = copy.deepcopy(settings.DJANGO_OPTIMIZER_CACHE)
         backend = params.pop('BACKEND')
         location = params.pop('LOCATION', '')
         backend_cls = import_string(backend)

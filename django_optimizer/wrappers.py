@@ -19,6 +19,7 @@ def optimizer_query_set_wrapper(model):
             (OptimizerQuerySet, type(queryset)),
             {}
         )
+        # __init__ instructions have to be run explicitly
         queryset._location = ObjectLocation(queryset.model.__name__)
         queryset._iterable_class = OptimizerModelIterable
 

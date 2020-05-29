@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
 
+from django_optimizer.conf import settings
 from django_optimizer.location import ObjectLocation
 
 
@@ -22,13 +23,16 @@ class OptimizerIterable(object):
         ]
 
         for obj in super(OptimizerIterable, self).__iter__():
-            try:
-                obj._qs_location = location
-                obj._prefetch_lookup_names = prefetch_lookup_names
-            except AttributeError:
-                obj['_qs_location'] = location
-                obj['_prefetch_lookup_names'] = prefetch_lookup_names
-            yield logging_model_wrapper(obj)
+            if settings.DJANGO_OPTIMIZER_DISABLE_LOGGING:
+                yield obj
+            else:
+                try:
+                    obj._qs_location = location
+                    obj._prefetch_lookup_names = prefetch_lookup_names
+                except AttributeError:
+                    obj['_qs_location'] = location
+                    obj['_prefetch_lookup_names'] = prefetch_lookup_names
+                yield logging_model_wrapper(obj)
 
 
 class OptimizerModelIterable(OptimizerIterable, ModelIterable):

@@ -2,6 +2,7 @@
 from django.db import models
 from django.db.models import Prefetch
 
+from django_optimizer.conf import settings
 from django_optimizer.iterables import OptimizerModelIterable, OptimizerValuesIterable, \
     OptimizerFlatValuesListIterable, OptimizerValuesListIterable
 from django_optimizer.location import ObjectLocation
@@ -20,6 +21,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         Remembers its location, which is set in __init__() function of ObjectLocation class.
         """
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
+        self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
         self._location = ObjectLocation(self.model.__name__)
         self._iterable_class = OptimizerModelIterable
 
@@ -60,10 +62,10 @@ class OptimizerQuerySet(models.query.QuerySet):
         Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
         and prefetch_related() operations based on registry values and then updates self accordingly.
         """
-        # all of those functions doesn't make sense if object is outside of QuerySet and values(_list) has been called
+        # should be a noop if optimization is turned off or object is outside of QuerySet
         # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
-        # in case of values(_list), _optimize will be manually called before them and skipped later
-        if self._location and self._result_cache is None and self._fields is None:
+        # in case of values(_list), _optimize() will be manually called before them and skipped later
+        if self._enabled and self._location and self._result_cache is None and self._fields is None:
             fields = field_registry.get(self._location)
             qs = self._prepare_qs(*fields)
             self.__dict__.update(qs.__dict__)

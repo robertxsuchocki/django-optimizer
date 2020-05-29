@@ -14,7 +14,7 @@ class DjangoOptimizerSettings(object):
         except AttributeError:
             return super(DjangoOptimizerSettings, self).__getattribute__(item)
 
-    OPTIMIZER_CACHE = {
+    DJANGO_OPTIMIZER_CACHE = {
         'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
         'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
     }
@@ -28,6 +28,22 @@ class DjangoOptimizerSettings(object):
     and overwriting constantly. Ideally should disable any overwriting.
     
     If performance issues occur, then it should be dropped in favor of manual in-code optimization (at least partially).
+    """
+
+    DJANGO_OPTIMIZER_DISABLE_LOGGING = False
+    """
+    Whether model logging should be disabled.
+    
+    Might be used to disable this app completely (with `DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION`) or in a state
+    where all fields have been gathered in a cache and overhead related with enabling object logging is unwanted.
+    """
+
+    DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION = False
+    """
+    Whether queryset optimization should be disabled.
+    
+    Might be used to disable this app completely (with `DJANGO_OPTIMIZER_DISABLE_LOGGING`) or in some cases
+    where only logging is required (caching is not desirable and app is used to generate source code changes).
     """
 
 
