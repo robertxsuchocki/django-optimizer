@@ -76,15 +76,15 @@ class QuerySetFieldRegistry:
         self.add_key(key)
         return value
 
-    def _append_tuple(self, qs_location, index, *args):
+    def append_tuple(self, qs_location, index, *args):
         """
         Core function to add field names to registry's queryset entry
 
         Retrieves value from cache based on location object, appends one set and writes value back
 
         :param qs_location: queryset's ObjectLocation object defining cache key
-        :param values: set of field names to be inserted to one of the sets
         :param index: index of a set to append
+        :param args: field names to be inserted to one of the sets
         :return:
         """
         if qs_location:
@@ -93,15 +93,7 @@ class QuerySetFieldRegistry:
             for arg in args:
                 tup[index].add(arg)
             self.cache.set(key, tup)
-
-    def set_select(self, qs_location, *args):
-        self._append_tuple(qs_location, self.SELECT, *args)
-
-    def set_prefetch(self, qs_location, *args):
-        self._append_tuple(qs_location, self.PREFETCH, *args)
-
-    def set_only(self, qs_location, *args):
-        self._append_tuple(qs_location, self.ONLY, *args)
+            return tup
 
     @staticmethod
     def _get_cache():

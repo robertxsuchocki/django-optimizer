@@ -6,7 +6,6 @@ OptimizerQuerySet objects to enable logging from fetched objects
 from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
 
 from django_optimizer.conf import settings
-from django_optimizer.location import ObjectLocation
 
 
 class LoggingIterable(object):
@@ -19,23 +18,14 @@ class LoggingIterable(object):
     def __iter__(self):
         from django_optimizer.wrappers import logging_model_wrapper
 
-        qs = self.queryset
-        location = getattr(qs, '_location', ObjectLocation(qs.model.__name__))
-        prefetch_lookup_names = [
-            getattr(lookup, 'prefetch_through', str(lookup))
-            for lookup in qs._prefetch_related_lookups
-        ]
-
         for obj in super(LoggingIterable, self).__iter__():
             if settings.DJANGO_OPTIMIZER_DISABLE_LOGGING:
                 yield obj
             else:
                 try:
-                    obj._qs_location = location
-                    obj._prefetch_lookup_names = prefetch_lookup_names
+                    obj._queryset = self.queryset
                 except AttributeError:
-                    obj['_qs_location'] = location
-                    obj['_prefetch_lookup_names'] = prefetch_lookup_names
+                    obj['_queryset'] = self.queryset
                 yield logging_model_wrapper(obj)
 
 

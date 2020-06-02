@@ -26,6 +26,8 @@ class OptimizerQuerySet(models.query.QuerySet):
         super(OptimizerQuerySet, self).__init__(*args, **kwargs)
         self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
         self._location = ObjectLocation(self.model.__name__)
+        self._registry_fields = field_registry.get(self._location)
+        self._without_only = not self._registry_fields[field_registry.ONLY]
         self._iterable_class = LoggingModelIterable
 
     def _fetch_all(self):
@@ -69,8 +71,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
         # in case of values(_list), _optimize() will be manually called before them and skipped later
         if self._enabled and self._location and self._result_cache is None and self._fields is None:
-            fields = field_registry.get(self._location)
-            qs = self._prepare_qs(*fields)
+            qs = self._prepare_qs(*self._registry_fields)
             self.__dict__.update(qs.__dict__)
 
     def _prepare_qs(self, select, prefetch, only):
@@ -125,9 +126,11 @@ class OptimizerQuerySet(models.query.QuerySet):
     def _perform_only(self, fields):
         qs = self
 
-        # only() without arguments acts like no-op, in this case no data should be retrieved
-        # setting it to the list containing only 'id' seems to be a reasonable minimum
-        fields |= {'id'}
+        # first evaluation of a queryset skips only for performance reasons (.only('id') was painfully slow)
+        # instead on first evaluation most common fields are gathered even if they exist in an object
+        # every evaluation after that will consider whether field exist or not prior to adding it to fields
+        if not fields:
+            return qs
 
         # if only doesn't have fields specified previously in select_related, then InvalidQuery error is raised
         # this needs to be taken care of here, fields have to contain contents of select_related field in query
@@ -148,3 +151,16 @@ class OptimizerQuerySet(models.query.QuerySet):
         qs = qs.only(*fields)
 
         return qs
+
+    def _add_field(self, field, index):
+        if field not in self._registry_fields[index]:
+            self._registry_fields = field_registry.append_tuple(self._location, index, field)
+
+    def _add_select(self, field):
+        self._add_field(field, field_registry.SELECT)
+
+    def _add_prefetch(self, field):
+        self._add_field(field, field_registry.PREFETCH)
+
+    def _add_only(self, field):
+        self._add_field(field, field_registry.ONLY)

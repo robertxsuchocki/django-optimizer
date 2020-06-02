@@ -43,36 +43,47 @@ def logging_model_wrapper(model):
     :return: wrapped object
     """
     def _add_select_field(obj, field_obj):
-        has_qs = hasattr(obj, '_qs_location')
         to_one = field_obj.one_to_one or field_obj.many_to_one
         no_cache = not hasattr(obj, field_obj.get_cache_name())
-        if has_qs and to_one and no_cache:
-            field_registry.set_select(obj._qs_location, field_obj.name)
+        if to_one and no_cache:
+            obj._queryset._add_select(field_obj.name)
 
     def _add_prefetch_field(obj, field_obj):
-        has_qs = hasattr(obj, '_qs_location')
         to_many = field_obj.one_to_many or field_obj.many_to_many
-        no_name = hasattr(obj, '_prefetch_lookup_names') and field_obj.name not in obj._prefetch_lookup_names
-        if has_qs and to_many and no_name:
-            field_registry.set_prefetch(obj._qs_location, field_obj.name)
+        prefetch_lookup_names = [
+            getattr(lookup, 'prefetch_through', str(lookup))
+            for lookup in obj._queryset._prefetch_related_lookups
+        ]
+        no_name = field_obj.name not in prefetch_lookup_names
+        if to_many and no_name:
+            obj._queryset._add_prefetch(field_obj.name)
+
+    def _add_related_field(obj, field_obj, item):
+        is_relation = field_obj.is_relation
+        is_field_colname = item == field_obj.get_attname()
+        if is_relation and not is_field_colname:
+            _add_select_field(obj, field_obj)
+            _add_prefetch_field(obj, field_obj)
+
+    def _add_value_field(obj, item):
+        if obj._queryset._without_only:
+            obj._queryset._add_only(item)
 
     def instance_getattribute(self, item):
-        if item not in ['_meta', '__dict__']:
+        if item != 'id' and not item.startswith('_'):
             try:
                 field = self._meta.get_field(item)
-                is_relation = field.is_relation
-                is_field_colname = isinstance(field, models.Field) and item == field.get_attname()
-                if is_relation and not is_field_colname:
-                    _add_select_field(self, field)
-                    _add_prefetch_field(self, field)
+                if isinstance(field, models.Field):
+                    _add_value_field(self, item)
+                    _add_related_field(self, field, item)
             except FieldDoesNotExist:
                 pass
         return object.__getattribute__(self, item)
 
     def refresh_from_db(self, using=None, fields=None):
-        missing_fields = [field for field in fields if not hasattr(self.__dict__, field)]
-        if missing_fields:
-            field_registry.set_only(self._qs_location, *missing_fields)
+        if fields:
+            for field in fields:
+                self._queryset._add_only(field)
         super(type(self), self).refresh_from_db(using, fields)
 
     if not isinstance(model, dict):
