@@ -24,6 +24,7 @@ class QuerySetFieldRegistry:
     PREFETCH = 1
     ONLY = 2
 
+    INITIAL_VALUE = set(), set(), set()
     KEY_SET = '__django_optimizer_key_set'
 
     def __init__(self):
@@ -56,44 +57,34 @@ class QuerySetFieldRegistry:
         """
         Gets value from cache and returns it
 
-        If cache didn't have this value, initializes it with tuple of 3 empty sets
+        If cache didn't have value for this location, returns a tuple of 3 empty sets
 
         :param qs_location: queryset's ObjectLocation object defining cache key
         :return: tuple of 3 sets of field names
         """
         key = str(qs_location)
-        return self.cache.get(key) or self._get_init_value(key)
+        return self.cache.get(key) or copy.deepcopy(self.INITIAL_VALUE)
 
-    def _get_init_value(self, key):
-        """
-        Sets value of key in cache to initial value, then returns it
-
-        :param key: key in cache to initialize
-        :return: init value
-        """
-        value = set(), set(), set()
-        self.cache.set(key, value)
-        self.add_key(key)
-        return value
-
-    def append_tuple(self, qs_location, index, *args):
+    def append_tuple(self, qs_location, index, field):
         """
         Core function to add field names to registry's queryset entry
 
         Retrieves value from cache based on location object, appends one set and writes value back
 
+        Adds a key to key set if corresponding value in cache didn't exist
+
         :param qs_location: queryset's ObjectLocation object defining cache key
         :param index: index of a set to append
-        :param args: field names to be inserted to one of the sets
+        :param field: field name to be inserted to one of the sets
         :return:
         """
-        if qs_location:
-            key = str(qs_location)
-            tup = self.get(key)
-            for arg in args:
-                tup[index].add(arg)
-            self.cache.set(key, tup)
-            return tup
+        key = str(qs_location)
+        tup = self.get(key)
+        if tup == self.INITIAL_VALUE:
+            self.add_key(key)
+        tup[index].add(field)
+        self.cache.set(key, tup)
+        return tup
 
     @staticmethod
     def _get_cache():
