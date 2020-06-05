@@ -3,10 +3,32 @@
 Transaction module storing GatheringAtomic context manager,
 which delays db saves and tries to perform them later in bulk operations
 """
-from django.db import DEFAULT_DB_ALIAS, models
+from django.db import DEFAULT_DB_ALIAS, models, router
+from django.db.models.signals import pre_save, post_save
 from django.db.transaction import Atomic
 
 from django_optimizer.registry import model_registry
+
+
+def _get_signal_params(obj, **kwargs):
+    params = {
+        'sender': obj.__class__,
+        'instance': obj,
+        'created': True,
+        'update_fields': kwargs.get('update_fields'),
+        'raw': kwargs.get('raw', False),
+        'using': kwargs.get('using', router.db_for_write(obj.__class__, instance=obj))
+    }
+
+    return params
+
+
+def _send_pre_save(obj, **params):
+    pre_save.send(**_get_signal_params(obj, **params))
+
+
+def _send_post_save(obj, **params):
+    post_save.send(**_get_signal_params(obj, **params))
 
 
 class GatheringAtomic(Atomic):
@@ -35,7 +57,9 @@ class GatheringAtomic(Atomic):
             if obj.id is not None:
                 obj._default_save(**kwargs)
             else:
+                _send_pre_save(obj, **kwargs)
                 model_registry.add(obj)
+                _send_post_save(obj, **kwargs)
 
         models.Model._default_save = models.Model.save
         models.Model.save = _gathering_save

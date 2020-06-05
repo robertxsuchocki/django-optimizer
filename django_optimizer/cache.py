@@ -18,6 +18,8 @@ class PersistentLocMemCache(LocMemCache):
     def _has_expired(self, key):
         """
         Method's name is misleading as it's also used to check whether key was added at all
+
+        Also checking for None might not be enough, that's why (pretty ugly) comparison to -1 in default is used
         """
         return self._expire_info.get(key, -1) == -1
 
