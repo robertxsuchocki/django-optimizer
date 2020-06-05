@@ -64,7 +64,7 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _optimize(self):
         """
-        Retrieves field sets from QuerySetFieldRegistry, then appends qs with only(), select_related()
+        Retrieves field sets from FieldRegistry, then appends qs with only(), select_related()
         and prefetch_related() operations based on registry values and then updates self accordingly
         """
         # should be a noop if optimization is turned off or object is outside of QuerySet
@@ -154,7 +154,7 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _add_field(self, field, index):
         if field not in self._registry_fields[index]:
-            self._registry_fields = field_registry.append_tuple(self._location, index, field)
+            self._registry_fields = field_registry.add(self._location, index, field)
 
     def _add_select(self, field):
         self._add_field(field, field_registry.SELECT)

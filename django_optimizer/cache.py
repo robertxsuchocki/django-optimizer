@@ -5,6 +5,21 @@ Cache module containing a definition of a PersistentFileBasedCache
 import pickle
 
 from django.core.cache.backends.filebased import FileBasedCache
+from django.core.cache.backends.locmem import LocMemCache
+
+
+class PersistentLocMemCache(LocMemCache):
+    """
+    A modified version on django's LocMemCache, that skips the code removing existing keys
+    """
+    def _cull(self):
+        pass
+
+    def _has_expired(self, key):
+        """
+        Method's name is misleading as it's also used to check whether key was added at all
+        """
+        return self._expire_info.get(key, -1) == -1
 
 
 class PersistentFileBasedCache(FileBasedCache):
@@ -16,9 +31,6 @@ class PersistentFileBasedCache(FileBasedCache):
     Do keep in mind that this cache may get really big as it's not limited in size in any way
     """
     def _cull(self):
-        """
-        Skips removal of keys
-        """
         pass
 
     def _is_expired(self, f):

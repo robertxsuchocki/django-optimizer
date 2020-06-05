@@ -20,19 +20,19 @@ Quick start
         'django-optimizer',
     ]
 
-3. By default, optimizer uses file-based cache to store data needed in query optimization. To change location or type of this cache, define `DJANGO_OPTIMIZER_CACHE` variable in your project's settings like this (variable fields are equivalent to django's `CACHES` variable) ::
+3. By default, optimizer uses file-based cache to store data needed in query optimization. To change location or type of this cache, define `DJANGO_OPTIMIZER_FIELD_REGISTRY` variable in your project's settings like this (variable fields are equivalent to django's `CACHES` variable) ::
 
     # These are default settings, using persistent version of file-based django cache and
-    # storing this cache in `.django-optimizer-cache` subdirectory of your project
-    DJANGO_OPTIMIZER_CACHE = {
+    # storing this cache in `.django_optimizer_field_registry` subdirectory of your project
+    DJANGO_OPTIMIZER_FIELD_REGISTRY = {
         'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
-        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
+        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django_optimizer_field_registry')
     }
 
 4. For default cache settings, add this line to `.gitignore` file to disable tracking of cache files ::
 
     # django-optimizer's cache files
-    .django-optimizer-cache/
+    .django_optimizer_field_registry/
 
 5. To enable optimization of a queryset, add OptimizerQuerySet to its definition, like this::
 

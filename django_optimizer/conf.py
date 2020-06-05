@@ -17,20 +17,25 @@ class DjangoOptimizerSettings(object):
         except AttributeError:
             return super(DjangoOptimizerSettings, self).__getattribute__(item)
 
-    DJANGO_OPTIMIZER_CACHE = {
+    DJANGO_OPTIMIZER_FIELD_REGISTRY = {
         'BACKEND': 'django_optimizer.cache.PersistentFileBasedCache',
-        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')
+        'LOCATION': os.path.join(django.conf.settings.BASE_DIR, '.django_optimizer_field_registry')
     }
     """
     Cache to be used in field registry (which contains tuples of fields gathered and used to optimize queries)
     
     Defaults to PersistentFileBasedCache (FileBasedCache, but with no-ops for functions clearing any keys in cache)
-    Its' default path is equal to ``os.path.join(django.conf.settings.BASE_DIR, '.django-optimizer-cache')``
+    Its' default path is equal to ``os.path.join(django.conf.settings.BASE_DIR, '.django_optimizer_field_registry')``
     
     Keep in mind that cache shouldn't be eager to remove any entries contained, as they will be reappearing
     and overwriting constantly. Ideally should disable any overwriting
     
     If performance issues occur, then it should be dropped in favor of manual in-code optimization (at least partially)
+    """
+
+    DJANGO_OPTIMIZER_MODEL_REGISTRY_LOCATION = '__django_optimizer_model_registry'
+    """
+    Name of a PersistentLocMemCache holding objects to be created after gathering_atomic block
     """
 
     DJANGO_OPTIMIZER_DISABLE_LOGGING = False

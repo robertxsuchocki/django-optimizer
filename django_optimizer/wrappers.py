@@ -9,7 +9,6 @@ from django.db import models
 
 from django_optimizer.iterables import LoggingModelIterable
 from django_optimizer.location import ObjectLocation
-from django_optimizer.registry import field_registry
 from django_optimizer.query import OptimizerQuerySet
 
 

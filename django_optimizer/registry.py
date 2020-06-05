@@ -2,7 +2,7 @@
 """
 Registry module
 
-Contains a definition of a QuerySetFieldRegistry - object containing information
+Contains a definition of a FieldRegistry - object containing information
 about field names required to optimize querysets
 """
 import ast
@@ -14,24 +14,32 @@ from django.utils.module_loading import import_string
 from django_optimizer.conf import settings
 
 
-class QuerySetFieldRegistry:
-    """
-    Wrapper for a filebased cache for storing field sets used to optimize querysets
-
-    Holds 3 different sets containing names of fields to be passed to only(), select_related() and prefetch_related()
-    """
-    SELECT = 0
-    PREFETCH = 1
-    ONLY = 2
-
-    INITIAL_VALUE = set(), set(), set()
-    KEY_SET = '__django_optimizer_key_set'
-
-    def __init__(self):
+class Registry(object):
+    def __init__(self, cache_settings, initial_value, key_list_id):
         """
-        Gets PersistentFileBasedCache with field sets (or FileBasedCache with custom options if stated in settings)
+        Gets registry wrapping cache object with key management and csv conversion enabled
+
+        :param cache_settings: parameters passed to cache
+        :param initial_value: empty value in cache
+        :param key_list_id: unique id for key list
         """
-        self.cache = self._get_cache()
+        self.cache = self._get_cache(cache_settings)
+        self.initial_value = initial_value
+        self.key_list_id = key_list_id
+
+    @staticmethod
+    def _get_cache(cache_params):
+        """
+        Instantiates cache object based on settings
+
+        :param cache_params: parameters passed to cache including required 'BACKEND' and 'LOCATION' settings
+        :return: cache object for registry
+        """
+        params = copy.deepcopy(cache_params)
+        backend = params.pop('BACKEND')
+        location = params.pop('LOCATION', '')
+        backend_cls = import_string(backend)
+        return backend_cls(location, params)
 
     def add_key(self, key):
         """
@@ -39,65 +47,70 @@ class QuerySetFieldRegistry:
 
         :param key: key to be added
         """
-        key_set = self.get_keys()
-        key_set.add(key)
-        self.cache.set(self.KEY_SET, key_set)
+        key_list = self.get_keys()
+        key_list.append(key)
+        self.cache.set(self.key_list_id, key_list)
 
     def get_keys(self):
         """
         Gets all names of keys that has been added
 
-        They are later used on saving cache to csv as most caches don't have a way of getting all pairs
+        They may be later used on listing all entries or dumping cache to csv
+        as most caches don't have a way of getting all pairs
 
         :return: set of key names
         """
-        return self.cache.get(self.KEY_SET) or set()
+        return self.cache.get(self.key_list_id) or []
 
-    def get(self, qs_location):
+    def get(self, key):
         """
         Gets value from cache and returns it
 
-        If cache didn't have value for this location, returns a tuple of 3 empty sets
+        If cache didn't have value for this location, returns an initial value
 
-        :param qs_location: queryset's ObjectLocation object defining cache key
-        :return: tuple of 3 sets of field names
+        :param key: any object, which str method defines cache key
+        :return: value received from registry cache or init value
         """
-        key = str(qs_location)
-        return self.cache.get(key) or copy.deepcopy(self.INITIAL_VALUE)
+        return self.cache.get(str(key)) or copy.deepcopy(self.initial_value)
 
-    def append_tuple(self, qs_location, index, field):
+    def set(self, key, modifier=lambda x: None):
         """
-        Core function to add field names to registry's queryset entry
-
-        Retrieves value from cache based on location object, appends one set and writes value back
+        Sets a new value on key based on passed setter function
 
         Adds a key to key set if corresponding value in cache didn't exist
 
-        :param qs_location: queryset's ObjectLocation object defining cache key
-        :param index: index of a set to append
-        :param field: field name to be inserted to one of the sets
-        :return:
+        :param key: any object, which str method defines cache key
+        :param modifier: function to be used with value retrieved from cache, which modifies a value
+        :return: value received from cache and modified by setter
         """
-        key = str(qs_location)
-        tup = self.get(key)
-        if tup == self.INITIAL_VALUE:
+        key = str(key)
+        value = self.get(key)
+        if value == self.initial_value:
             self.add_key(key)
-        tup[index].add(field)
-        self.cache.set(key, tup)
-        return tup
+        modifier(value)
+        self.cache.set(key, value)
+        return value
 
     @staticmethod
-    def _get_cache():
+    def row_to_pair(row):
         """
-        Instantiates cache object based on project settings
+        Converts csv row to cache (k, v) pair
 
-        :return: cache object for registry
+        :param row: list of contents in a csv file row
+        :return: key and value pair for cache
         """
-        params = copy.deepcopy(settings.DJANGO_OPTIMIZER_CACHE)
-        backend = params.pop('BACKEND')
-        location = params.pop('LOCATION', '')
-        backend_cls = import_string(backend)
-        return backend_cls(location, params)
+        return None, None
+
+    @staticmethod
+    def pair_to_row(key, value):
+        """
+        Converts cache (k, v) pair to csv row
+
+        :param key: cache key
+        :param value: value from cache
+        :return: list of contents in a row to be added to csv file
+        """
+        return []
 
     def from_csv(self, filepath, clear=True):
         """
@@ -111,9 +124,9 @@ class QuerySetFieldRegistry:
         with open(filepath) as csv_file:
             reader = csv.reader(csv_file, delimiter=',')
             for row in reader:
-                select, prefetch, only = [ast.literal_eval(r) for r in row[1:]]
-                self.add_key(row[0])
-                self.cache.set(row[0], (set(select), set(prefetch), set(only)))
+                key, val = self.row_to_pair(row)
+                self.add_key(key)
+                self.cache.set(key, val)
 
     def to_csv(self, filepath):
         """
@@ -124,8 +137,70 @@ class QuerySetFieldRegistry:
         with open(filepath, mode='w') as csv_file:
             writer = csv.writer(csv_file, delimiter=',', quotechar='"', quoting=csv.QUOTE_MINIMAL)
             for key in sorted(self.get_keys()):
-                tup = self.get(key)
-                writer.writerow([key, list(tup[0]), list(tup[1]), list(tup[2])])
+                row = self.pair_to_row(key, self.get(key))
+                writer.writerow(row)
 
 
-field_registry = QuerySetFieldRegistry()
+class FieldRegistry(Registry):
+    """
+    Registry with a cache for storing field sets used to optimize querysets
+
+    Holds 3 different sets containing names of fields to be passed to select_related(), prefetch_related() and only()
+    """
+    SELECT = 0
+    PREFETCH = 1
+    ONLY = 2
+
+    def __init__(self):
+        super(FieldRegistry, self).__init__(
+            cache_settings=settings.DJANGO_OPTIMIZER_FIELD_REGISTRY,
+            initial_value=(set(), set(), set()),
+            key_list_id='__field_registry_key_set'
+        )
+
+    def add(self, qs_location, index, field):
+        """
+        Adds new field name to set in cache on given index
+
+        :param qs_location: queryset's ObjectLocation object defining cache key
+        :param index: index of a set to append
+        :param field: field name to be inserted to one of the sets
+        :return: appended tuple from cache
+        """
+        return self.set(qs_location, lambda x: x[index].add(field))
+
+    @staticmethod
+    def row_to_pair(row):
+        select, prefetch, only = [ast.literal_eval(r) for r in row[1:]]
+        return row[0], (set(select), set(prefetch), set(only))
+
+    @staticmethod
+    def pair_to_row(key, value):
+        return [key, list(value[0]), list(value[1]), list(value[2])]
+
+
+class ModelRegistry(Registry):
+    def __init__(self):
+        super(ModelRegistry, self).__init__(
+            cache_settings={
+                'BACKEND': 'django_optimizer.cache.PersistentLocMemCache',
+                'LOCATION': settings.DJANGO_OPTIMIZER_MODEL_REGISTRY_LOCATION
+            },
+            initial_value=[],
+            key_list_id='__model_registry_key_set'
+        )
+
+    def add(self, obj):
+        self.set(
+            '{module}.{name}'.format(module=obj.__module__, name=obj._meta.model.__name__),
+            lambda x: x.append(obj)
+        )
+
+    def get_all(self):
+        cache = [(import_string(key), self.get(key)) for key in self.get_keys()]
+        self.cache.clear()
+        return cache
+
+
+field_registry = FieldRegistry()
+model_registry = ModelRegistry()
