@@ -35,7 +35,7 @@ class DjangoOptimizerSettings(object):
 
     DJANGO_OPTIMIZER_MODEL_REGISTRY_LOCATION = '__django_optimizer_model_registry'
     """
-    Name of a PersistentLocMemCache holding objects to be created after gathering_atomic block
+    Name of a PersistentLocMemCache holding objects to be created after delayed_atomic block
     """
 
     DJANGO_OPTIMIZER_DISABLE_LOGGING = False

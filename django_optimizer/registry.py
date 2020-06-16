@@ -51,6 +51,16 @@ class Registry(object):
         key_list.append(key)
         self.cache.set(self.key_list_id, key_list)
 
+    def remove_key(self, key):
+        """
+        Adds a key name to separate cache field
+
+        :param key: key to be added
+        """
+        key_list = self.get_keys()
+        key_list.remove(key)
+        self.cache.set(self.key_list_id, key_list)
+
     def get_keys(self):
         """
         Gets all names of keys that has been added
@@ -196,7 +206,13 @@ class ModelRegistry(Registry):
             lambda x: x.append(obj)
         )
 
-    def get_all(self):
+    def pop_pair(self, key):
+        cache = [(import_string(key), self.get(key))]
+        self.remove_key(key)
+        self.cache.delete(key)
+        return cache
+
+    def pop_all(self):
         cache = [(import_string(key), self.get(key)) for key in self.get_keys()]
         self.cache.clear()
         return cache
