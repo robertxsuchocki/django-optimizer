@@ -3,6 +3,8 @@
 Transaction module storing DelayedAtomic context manager,
 which delays db saves and tries to perform them later in bulk operations
 """
+import copy
+
 from django.db import DEFAULT_DB_ALIAS, models, router, transaction
 from django_bulk_update.helper import bulk_update
 
@@ -24,8 +26,14 @@ def _get_signal_params(obj, **kwargs):
 
 def replace_save_method():
     def _delayed_save(self, **kwargs):
+        def _get_db_copy(obj):
+            copy_obj = copy.copy(obj)
+            for attr in ('_queryset', 'instance_getattribute', 'refresh_from_db'):
+                copy_obj.__dict__.pop(attr, None)
+            return copy_obj
+
         models.signals.pre_save.send(**_get_signal_params(self, **kwargs))
-        model_registry.add(self)
+        model_registry.add(_get_db_copy(self))
         models.signals.post_save.send(**_get_signal_params(self, **kwargs))
 
     models.Model._default_save = models.Model.save
