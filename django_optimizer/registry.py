@@ -41,6 +41,16 @@ class Registry(object):
         backend_cls = import_string(backend)
         return backend_cls(location, params)
 
+    def has_key(self, key):
+        """
+        Checks whether given key has been added before
+        
+        :param key: key to be checked
+        :return: whether key exists in field
+        """
+        key_list = self.get_keys()
+        return key in key_list
+
     def add_key(self, key):
         """
         Adds a key name to separate cache field
@@ -53,9 +63,9 @@ class Registry(object):
 
     def remove_key(self, key):
         """
-        Adds a key name to separate cache field
+        Removes a key name from cache field
 
-        :param key: key to be added
+        :param key: key to be removed
         """
         key_list = self.get_keys()
         key_list.remove(key)

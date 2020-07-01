@@ -14,11 +14,14 @@ from django_optimizer.registry import field_registry
 
 class OptimizerQuerySet(models.query.QuerySet):
     """
-    QuerySet objects that optimizes its queries based on maintained register holding sets of field names
+    QuerySet class that optimizes its queries based on maintained register holding sets of field names
 
     Based on these field names, object automatically performs only(), select_related() and prefetch_related()
     just before database query execution to optimize a query without programmer's work
+
+    Also delays database inserts in DelayedAtomic block + refreshes data here if needed
     """
+
     def __init__(self, *args, **kwargs):
         """
         Remembers its location, which is set in __init__() function of ObjectLocation class
@@ -32,12 +35,29 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _fetch_all(self):
         """
-        First optimizes queryset with usage of _optimize()
+        First optimizes queryset with usage of _optimize() and refreshes db if objects are hanging
 
-        Later proceeds to default _fetch_all() (which is responsible for retrieval of values from db)
+        Then proceeds to default _fetch_all() (which is responsible for retrieval of values from db)
         """
         self._optimize()
+        self._refresh_db()
         super(OptimizerQuerySet, self)._fetch_all()
+
+    def count(self):
+        """
+        Refreshes db if objects' saves are delayed and _fetch_all wasn't used
+        """
+        if self._result_cache is None:
+            self._refresh_db()
+        return super(OptimizerQuerySet, self).count()
+
+    def exists(self):
+        """
+        Refreshes db if objects' saves are delayed and _fetch_all wasn't used
+        """
+        if self._result_cache is None:
+            self._refresh_db()
+        return super(OptimizerQuerySet, self).exists()
 
     def values(self, *fields, **expressions):
         """
@@ -61,6 +81,13 @@ class OptimizerQuerySet(models.query.QuerySet):
         clone = super(OptimizerQuerySet, self).values_list(*fields, **kwargs)
         clone._iterable_class = LoggingFlatValuesListIterable if flat else LoggingValuesListIterable
         return clone
+
+    def _refresh_db(self):
+        from django_optimizer.transaction import perform_delayed_db_queries
+
+        perform_delayed_db_queries(
+            '{module}.{name}'.format(module=self.model.__module__, name=self.model.__name__)
+        )
 
     def _optimize(self):
         """

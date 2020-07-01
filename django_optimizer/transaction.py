@@ -38,12 +38,13 @@ def rollback_save_method():
 
 
 def perform_delayed_db_queries(key=None):
-    pairs = model_registry.pop_pair(key) if key else model_registry.pop_all()
-    for model, objects in pairs:
-        to_create = [obj for obj in objects if obj.id is None]
-        to_update = [obj for obj in objects if obj.id is not None]
-        model.objects.bulk_create(to_create)
-        bulk_update(to_update)
+    if not key or model_registry.has_key(key):
+        pairs = model_registry.pop_pair(key) if key else model_registry.pop_all()
+        for model, objects in pairs:
+            to_create = [obj for obj in objects if obj.id is None]
+            to_update = [obj for obj in objects if obj.id is not None]
+            model.objects.bulk_create(to_create)
+            bulk_update(to_update)
 
 
 class DelayedAtomic(transaction.Atomic):
