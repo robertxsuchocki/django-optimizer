@@ -8,6 +8,7 @@ import copy
 from django.db import DEFAULT_DB_ALIAS, models, router, transaction
 from django_bulk_update.helper import bulk_update
 
+from django_optimizer.query import OptimizerQuerySet
 from django_optimizer.registry import model_registry
 
 
@@ -32,9 +33,12 @@ def replace_save_method():
                 copy_obj.__dict__.pop(attr, None)
             return copy_obj
 
-        models.signals.pre_save.send(**_get_signal_params(self, **kwargs))
-        model_registry.add(_get_db_copy(self))
-        models.signals.post_save.send(**_get_signal_params(self, **kwargs))
+        if not isinstance(self._meta.model.objects.none(), OptimizerQuerySet):
+            self._default_save(**kwargs)
+        else:
+            models.signals.pre_save.send(**_get_signal_params(self, **kwargs))
+            model_registry.add(_get_db_copy(self))
+            models.signals.post_save.send(**_get_signal_params(self, **kwargs))
 
     models.Model._default_save = models.Model.save
     models.Model.save = _delayed_save
