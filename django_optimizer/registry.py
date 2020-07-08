@@ -210,11 +210,12 @@ class ModelRegistry(Registry):
             key_list_id='__model_registry_key_set'
         )
 
+    @staticmethod
+    def get_key_from_model(model):
+        return '{module}.{name}'.format(module=model.__module__, name=model.__name__) if model else None
+
     def add(self, obj):
-        self.set(
-            '{module}.{name}'.format(module=obj.__module__, name=obj._meta.model.__name__),
-            lambda x: x.append(obj)
-        )
+        self.set(self.get_key_from_model(obj._meta.model), lambda x: x.append(obj))
 
     def pop_pair(self, key):
         cache = [(import_string(key), self.get(key))]

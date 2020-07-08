@@ -85,9 +85,7 @@ class OptimizerQuerySet(models.query.QuerySet):
     def _refresh_db(self):
         from django_optimizer.transaction import perform_delayed_db_queries
 
-        perform_delayed_db_queries(
-            '{module}.{name}'.format(module=self.model.__module__, name=self.model.__name__)
-        )
+        perform_delayed_db_queries(self.model)
 
     def _optimize(self):
         """
