@@ -96,22 +96,11 @@ class DeferredPK(object):
 
         return field_value
 
-    def _get_value(self):
+    def get_value(self):
         data = self.instance.__dict__
         if isinstance(data.get(self.field_name, self), DeferredPK):
             data[self.field_name] = self._save_and_retrieve_pk()
         return data[self.field_name]
-
-    def __get__(self, instance, owner):
-        return self._get_value()
-
-    # FIXME naive value retrieval, doesn't have to be immediately casted in source code
-    def __int__(self):
-        return self._get_value()
-
-    def __str__(self):
-        val = self._get_value()
-        return str(val)
 
 
 class DelayedAtomic(transaction.Atomic):
