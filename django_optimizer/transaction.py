@@ -6,6 +6,7 @@ which delays db saves and tries to perform them later in bulk operations
 import copy
 
 from django.db import DEFAULT_DB_ALIAS, models, router, transaction
+from django.utils.functional import partition
 from django_bulk_update.helper import bulk_update
 
 from django_optimizer.query import OptimizerQuerySet
@@ -16,7 +17,7 @@ def _get_signal_params(obj, **kwargs):
     params = {
         'sender': obj.__class__,
         'instance': obj,
-        'created': True,
+        'created': obj._state.adding,
         'update_fields': kwargs.get('update_fields'),
         'raw': kwargs.get('raw', False),
         'using': kwargs.get('using', router.db_for_write(obj.__class__, instance=obj))
@@ -53,8 +54,7 @@ def perform_delayed_db_queries(key=None):
     if not key or model_registry.has_key(key):
         pairs = model_registry.pop_pair(key) if key else model_registry.pop_all()
         for model, objects in pairs:
-            to_create = [obj for obj in objects if obj.id is None]
-            to_update = [obj for obj in objects if obj.id is not None]
+            to_update, to_create = partition(lambda obj: obj._state.adding, objects)
             model.objects.bulk_create(to_create)
             bulk_update(to_update)
 
