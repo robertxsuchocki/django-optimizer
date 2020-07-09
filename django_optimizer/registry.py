@@ -9,6 +9,7 @@ import ast
 import copy
 import csv
 
+from django.forms.models import model_to_dict
 from django.utils.module_loading import import_string
 
 from django_optimizer.conf import settings
@@ -93,21 +94,21 @@ class Registry(object):
         """
         return self.cache.get(str(key)) or copy.deepcopy(self.initial_value)
 
-    def set(self, key, modifier=lambda x: None):
+    def set(self, key, modifier):
         """
         Sets a new value on key based on passed setter function
 
         Adds a key to key set if corresponding value in cache didn't exist
 
         :param key: any object, which str method defines cache key
-        :param modifier: function to be used with value retrieved from cache, which modifies a value
+        :param modifier: function to be used with value retrieved from cache, which returns a new value
         :return: value received from cache and modified by setter
         """
         key = str(key)
         value = self.get(key)
         if value == self.initial_value:
             self.add_key(key)
-        modifier(value)
+        value = modifier(value)
         self.cache.set(key, value)
         return value
 
@@ -187,7 +188,10 @@ class FieldRegistry(Registry):
         :param field: field name to be inserted to one of the sets
         :return: appended tuple from cache
         """
-        return self.set(qs_location, lambda x: x[index].add(field))
+        return self.set(
+            qs_location,
+            lambda x: tuple(s | {field} if index == i else s for i, s in enumerate(x))
+        )
 
     @staticmethod
     def row_to_pair(row):
@@ -215,7 +219,28 @@ class ModelRegistry(Registry):
         return '{module}.{name}'.format(module=model.__module__, name=model.__name__) if model else None
 
     def add(self, obj):
-        self.set(self.get_key_from_model(obj._meta.model), lambda x: x.append(obj))
+        self.set(
+            self.get_key_from_model(obj._meta.model),
+            lambda x: x + [obj]
+        )
+
+    def delete(self, obj):
+        def filter_out(n, function, iterable):
+            for item in iterable:
+                if function(item) and n > 0:
+                    n -= 1
+                else:
+                    yield item
+
+        def same_dict_with(given):
+            def inner(compared):
+                return model_to_dict(given, exclude='id') == model_to_dict(compared, exclude='id')
+            return inner
+
+        self.set(
+            self.get_key_from_model(obj._meta.model),
+            lambda x: list(filter_out(1, same_dict_with(obj), x))
+        )
 
     def pop_pair(self, key):
         cache = [(import_string(key), self.get(key))]

@@ -81,9 +81,7 @@ class DeferredPK(object):
         db_instance = get_db_instance(self.instance, self.field_name)
         db_instance.pk = None
         db_row = model.objects.bulk_create([db_instance])[0]
-
-        # FIXME delete one equal object
-        model_registry.pop_pair(model_registry.get_key_from_model(model))
+        model_registry.delete(db_instance)
 
         if not hasattr(db_row, self.field_name):
             field_names = [f.name for f in self.instance._meta.get_fields()]
