@@ -9,22 +9,22 @@ from django.db import models
 
 from django_optimizer.iterables import LoggingModelIterable
 from django_optimizer.location import ObjectLocation
-from django_optimizer.query import OptimizerQuerySet
+from django_optimizer.query import SelectiveQuerySet
 
 
-def optimizer_query_set_wrapper(model):
+def selective_query_set_wrapper(model):
     """
-    Adds OptimizerQuerySet mixin to queryset instance and modifies queryset objects behaviour
+    Adds SelectiveQuerySet mixin to queryset instance and modifies queryset objects behaviour
 
     :param model: model instance which specifies created queryset instance
     :return: wrapped queryset object
     """
     queryset = model.objects.all()
 
-    if not isinstance(queryset, OptimizerQuerySet):
+    if not isinstance(queryset, SelectiveQuerySet):
         queryset.__class__ = type(
-            'DjangoOptimizer' + type(queryset).__name__,
-            (OptimizerQuerySet, type(queryset)),
+            'DjangoSelective' + type(queryset).__name__,
+            (SelectiveQuerySet, type(queryset)),
             {}
         )
         # __init__ instructions have to be run explicitly

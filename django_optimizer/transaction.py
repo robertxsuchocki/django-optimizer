@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Transaction module storing DelayedAtomic context manager,
+Transaction module storing DeferredAtomic context manager,
 which delays db saves and tries to perform them later in bulk operations
 """
 import copy
@@ -9,21 +9,8 @@ from django.db import DEFAULT_DB_ALIAS, models, router, transaction
 from django.utils.functional import partition
 from django_bulk_update.helper import bulk_update
 
-from django_optimizer.query import OptimizerQuerySet
+from django_optimizer.query import DeferredQuerySet
 from django_optimizer.registry import model_registry
-
-
-def _get_signal_params(obj, **kwargs):
-    params = {
-        'sender': obj.__class__,
-        'instance': obj,
-        'created': obj._state.adding,
-        'update_fields': kwargs.get('update_fields'),
-        'raw': kwargs.get('raw', False),
-        'using': kwargs.get('using', router.db_for_write(obj.__class__, instance=obj))
-    }
-
-    return params
 
 
 def get_db_instance(obj, *args):
@@ -33,28 +20,7 @@ def get_db_instance(obj, *args):
     return obj
 
 
-def replace_save_method():
-    def _delayed_save(self, **kwargs):
-        if not isinstance(self._meta.model.objects.none(), OptimizerQuerySet):
-            self._default_save(**kwargs)
-        else:
-            models.signals.pre_save.send(**_get_signal_params(self, **kwargs))
-
-            model_registry.add(get_db_instance(self))
-            setattr(self, self._meta.pk.attname, DeferredPK(self))
-
-            models.signals.post_save.send(**_get_signal_params(self, **kwargs))
-
-    models.Model._default_save = models.Model.save
-    models.Model.save = _delayed_save
-
-
-def rollback_save_method():
-    models.Model.save = models.Model._default_save
-    del models.Model._default_save
-
-
-def perform_delayed_db_queries(model=None):
+def perform_deferred_db_queries(model=None):
     key = model_registry.get_key_from_model(model)
     if not key or model_registry.has_key(key):
         pairs = model_registry.pop_pair(key) if key else model_registry.pop_all()
@@ -68,7 +34,7 @@ class DeferredPK(object):
     """
     A wrapper for a deferred pk
 
-    When object's save() is delayed and its pk is accessed before usual bulk create,
+    When object's save() is deferred and its pk is accessed before usual bulk create,
     then the insertion query is executed immediately and its pk gets returned
     """
     def __init__(self, instance, *args, **kwargs):
@@ -101,26 +67,54 @@ class DeferredPK(object):
         return data[self.field_name]
 
 
-class DelayedAtomic(transaction.Atomic):
+class DeferredAtomic(transaction.Atomic):
     """
     Atomic block that additionally gathers objects meant to be created/updated
     and tries to minimize amount of sql queries used for that
 
     All db operations are done on atomic exit (for now)
     """
+    @staticmethod
+    def _deferred_save(obj, **kwargs):
+        def _get_signal_params(obj, **kwargs):
+            return {
+                'sender': obj.__class__,
+                'instance': obj,
+                'created': obj._state.adding,
+                'update_fields': kwargs.get('update_fields'),
+                'raw': kwargs.get('raw', False),
+                'using': kwargs.get('using', router.db_for_write(obj.__class__, instance=obj))
+            }
+        if not isinstance(obj._meta.model.objects.none(), DeferredQuerySet):
+            obj._default_save(**kwargs)
+        else:
+            models.signals.pre_save.send(**_get_signal_params(obj, **kwargs))
+            model_registry.add(get_db_instance(obj))
+            setattr(obj, obj._meta.pk.attname, DeferredPK(obj))
+            models.signals.post_save.send(**_get_signal_params(obj, **kwargs))
+
+    @classmethod
+    def _replace_save_method(cls):
+        models.Model._default_save = models.Model.save
+        models.Model.save = cls._deferred_save
+
+    @classmethod
+    def _rollback_save_method(cls):
+        models.Model.save = models.Model._default_save
+        del models.Model._default_save
 
     def __enter__(self):
-        replace_save_method()
-        super(DelayedAtomic, self).__enter__()
+        self._replace_save_method()
+        super(DeferredAtomic, self).__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
-        super(DelayedAtomic, self).__exit__(exc_type, exc_value, traceback)
-        rollback_save_method()
-        perform_delayed_db_queries()
+        super(DeferredAtomic, self).__exit__(exc_type, exc_value, traceback)
+        self._rollback_save_method()
+        perform_deferred_db_queries()
 
 
-def delayed_atomic(using=None, savepoint=True):
+def deferred_atomic(using=None, savepoint=True):
     if callable(using):
-        return DelayedAtomic(DEFAULT_DB_ALIAS, savepoint)(using)
+        return DeferredAtomic(DEFAULT_DB_ALIAS, savepoint)(using)
     else:
-        return DelayedAtomic(using, savepoint)
+        return DeferredAtomic(using, savepoint)

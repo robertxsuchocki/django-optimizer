@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-Query module - OptimizerQuerySet definition
+Query module - SelectiveQuerySet and DeferredQuerySet definition
 """
 from django.db import models
 from django.db.models import Prefetch
@@ -12,21 +12,19 @@ from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
 
 
-class OptimizerQuerySet(models.query.QuerySet):
+class SelectiveQuerySet(models.query.QuerySet):
     """
     QuerySet class that optimizes its queries based on maintained register holding sets of field names
 
     Based on these field names, object automatically performs only(), select_related() and prefetch_related()
     just before database query execution to optimize a query without programmer's work
-
-    Also delays database inserts in DelayedAtomic block + refreshes data here if needed
     """
 
     def __init__(self, *args, **kwargs):
         """
         Remembers its location, which is set in __init__() function of ObjectLocation class
         """
-        super(OptimizerQuerySet, self).__init__(*args, **kwargs)
+        super(SelectiveQuerySet, self).__init__(*args, **kwargs)
         self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
         self._location = ObjectLocation(self.model.__name__)
         self._registry_fields = field_registry.get(self._location)
@@ -41,23 +39,23 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         self._optimize()
         self._refresh_db()
-        super(OptimizerQuerySet, self)._fetch_all()
+        super(SelectiveQuerySet, self)._fetch_all()
 
     def count(self):
         """
-        Refreshes db if objects' saves are delayed and _fetch_all wasn't used
+        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
         """
         if self._result_cache is None:
             self._refresh_db()
-        return super(OptimizerQuerySet, self).count()
+        return super(SelectiveQuerySet, self).count()
 
     def exists(self):
         """
-        Refreshes db if objects' saves are delayed and _fetch_all wasn't used
+        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
         """
         if self._result_cache is None:
             self._refresh_db()
-        return super(OptimizerQuerySet, self).exists()
+        return super(SelectiveQuerySet, self).exists()
 
     def values(self, *fields, **expressions):
         """
@@ -66,7 +64,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         Also uses custom Iterable class, that populates necessary data from QuerySet to Model
         """
         self._optimize()
-        clone = super(OptimizerQuerySet, self).values(*fields, **expressions)
+        clone = super(SelectiveQuerySet, self).values(*fields, **expressions)
         clone._iterable_class = LoggingValuesIterable
         return clone
 
@@ -78,14 +76,14 @@ class OptimizerQuerySet(models.query.QuerySet):
         """
         self._optimize()
         flat = kwargs.get('flat', False)
-        clone = super(OptimizerQuerySet, self).values_list(*fields, **kwargs)
+        clone = super(SelectiveQuerySet, self).values_list(*fields, **kwargs)
         clone._iterable_class = LoggingFlatValuesListIterable if flat else LoggingValuesListIterable
         return clone
 
     def _refresh_db(self):
-        from django_optimizer.transaction import perform_delayed_db_queries
+        from django_optimizer.transaction import perform_deferred_db_queries
 
-        perform_delayed_db_queries(self.model)
+        perform_deferred_db_queries(self.model)
 
     def _optimize(self):
         """
@@ -128,7 +126,7 @@ class OptimizerQuerySet(models.query.QuerySet):
         return qs
 
     def _perform_prefetch_related(self, fields):
-        from django_optimizer.wrappers import optimizer_query_set_wrapper
+        from django_optimizer.wrappers import selective_query_set_wrapper
 
         qs = self
 
@@ -142,7 +140,7 @@ class OptimizerQuerySet(models.query.QuerySet):
             if label not in prefetch_lookups:
                 field = self.model._meta.get_field(label)
                 model = field.model if self.model != field.model else field.related_model
-                queryset = optimizer_query_set_wrapper(model)
+                queryset = selective_query_set_wrapper(model)
                 prefetch_obj = Prefetch(field.name, queryset=queryset)
                 qs = qs.prefetch_related(prefetch_obj)
 
@@ -189,3 +187,43 @@ class OptimizerQuerySet(models.query.QuerySet):
 
     def _add_only(self, field):
         self._add_field(field, field_registry.ONLY)
+
+
+class DeferredQuerySet(models.query.QuerySet):
+    """
+    QuerySet class that delays database inserts in DeferredAtomic block
+
+    DeferredAtomic block checks whether object is an instance of this class before deferring saves,
+    also the class itself performs save on cached data early if queries are being done on deferred model
+    """
+    def _refresh_db(self):
+        from django_optimizer.transaction import perform_deferred_db_queries
+
+        perform_deferred_db_queries(self.model)
+
+    def _fetch_all(self):
+        """
+        Saves deferred data to db before any queryset evaluation
+        """
+        self._refresh_db()
+        super(DeferredQuerySet, self)._fetch_all()
+
+    def count(self):
+        """
+        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
+        """
+        if self._result_cache is None:
+            self._refresh_db()
+        return super(DeferredQuerySet, self).count()
+
+    def exists(self):
+        """
+        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
+        """
+        if self._result_cache is None:
+            self._refresh_db()
+        return super(DeferredQuerySet, self).exists()
+
+
+class OptimizerQuerySet(SelectiveQuerySet, DeferredQuerySet):
+    pass

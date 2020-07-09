@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 """
 Iterables module containing iterables objects that are later used by
-OptimizerQuerySet objects to enable logging from fetched objects
+SelectiveQuerySet objects to enable logging from fetched objects
 """
 from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
 
