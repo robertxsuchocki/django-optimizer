@@ -38,24 +38,7 @@ class SelectiveQuerySet(models.query.QuerySet):
         Then proceeds to default _fetch_all() (which is responsible for retrieval of values from db)
         """
         self._optimize()
-        self._refresh_db()
         super(SelectiveQuerySet, self)._fetch_all()
-
-    def count(self):
-        """
-        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
-        """
-        if self._result_cache is None:
-            self._refresh_db()
-        return super(SelectiveQuerySet, self).count()
-
-    def exists(self):
-        """
-        Refreshes db if objects' saves are deferred and _fetch_all wasn't used
-        """
-        if self._result_cache is None:
-            self._refresh_db()
-        return super(SelectiveQuerySet, self).exists()
 
     def values(self, *fields, **expressions):
         """
@@ -79,11 +62,6 @@ class SelectiveQuerySet(models.query.QuerySet):
         clone = super(SelectiveQuerySet, self).values_list(*fields, **kwargs)
         clone._iterable_class = LoggingFlatValuesListIterable if flat else LoggingValuesListIterable
         return clone
-
-    def _refresh_db(self):
-        from django_optimizer.transaction import perform_deferred_db_queries
-
-        perform_deferred_db_queries(self.model)
 
     def _optimize(self):
         """
