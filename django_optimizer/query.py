@@ -4,10 +4,10 @@ Query module - SelectiveQuerySet and DeferredQuerySet definition
 """
 from django.db import models
 from django.db.models import Prefetch
+from django.db.models.query import ModelIterable
 
 from django_optimizer.conf import settings
-from django_optimizer.iterables import LoggingModelIterable, LoggingValuesIterable, \
-    LoggingFlatValuesListIterable, LoggingValuesListIterable
+from django_optimizer.iterables import LoggingModelIterable, LoggingValuesIterable, LoggingValuesListIterable
 from django_optimizer.location import ObjectLocation
 from django_optimizer.registry import field_registry
 
@@ -29,7 +29,6 @@ class SelectiveQuerySet(models.query.QuerySet):
         self._location = ObjectLocation(self.model.__name__)
         self._registry_fields = field_registry.get(self._location)
         self._without_only = not self._registry_fields[field_registry.ONLY]
-        self._iterable_class = LoggingModelIterable
 
     def _fetch_all(self):
         """
@@ -60,7 +59,8 @@ class SelectiveQuerySet(models.query.QuerySet):
         self._optimize()
         flat = kwargs.get('flat', False)
         clone = super(SelectiveQuerySet, self).values_list(*fields, **kwargs)
-        clone._iterable_class = LoggingFlatValuesListIterable if flat else LoggingValuesListIterable
+        if not flat:
+            clone._iterable_class = LoggingValuesListIterable
         return clone
 
     def _optimize(self):
@@ -72,6 +72,8 @@ class SelectiveQuerySet(models.query.QuerySet):
         # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
         # in case of values(_list), _optimize() will be manually called before them and skipped later
         if self._enabled and self._location and self._result_cache is None and self._fields is None:
+            if self._iterable_class is ModelIterable:
+                self._iterable_class = LoggingModelIterable
             qs = self._prepare_qs(*self._registry_fields)
             self.__dict__.update(qs.__dict__)
 

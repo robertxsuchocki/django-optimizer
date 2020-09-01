@@ -59,8 +59,8 @@ def logging_model_wrapper(model):
 
     def _add_related_field(obj, field_obj, item):
         is_relation = field_obj.is_relation
-        is_field_colname = item == field_obj.get_attname()
-        if is_relation and not is_field_colname:
+        is_exact_field = item == field_obj.name
+        if is_relation and is_exact_field:
             _add_select_field(obj, field_obj)
             _add_prefetch_field(obj, field_obj)
 

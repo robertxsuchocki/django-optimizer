@@ -3,7 +3,7 @@
 Iterables module containing iterables objects that are later used by
 SelectiveQuerySet objects to enable logging from fetched objects
 """
-from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable, FlatValuesListIterable
+from django.db.models.query import ModelIterable, ValuesIterable, ValuesListIterable
 
 from django_optimizer.conf import settings
 
@@ -38,8 +38,4 @@ class LoggingValuesIterable(LoggingIterable, ValuesIterable):
 
 
 class LoggingValuesListIterable(LoggingIterable, ValuesListIterable):
-    pass
-
-
-class LoggingFlatValuesListIterable(LoggingIterable, FlatValuesListIterable):
     pass
