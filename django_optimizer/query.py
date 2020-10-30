@@ -83,9 +83,9 @@ class SelectiveQuerySet(models.query.QuerySet):
 
         Only needs to be last, because it needs to know full list of select_related() fields
 
-        :param only: field names to use with only()
         :param select: field names to use with select_related()
         :param prefetch: field names to use with prefetch_related()
+        :param only: field names to use with only()
         :return: final queryset object
         """
         return self._perform_select_related(select)._perform_prefetch_related(prefetch)._perform_only(only)
@@ -102,6 +102,19 @@ class SelectiveQuerySet(models.query.QuerySet):
         # passing empty list turns on select on all fields (opposite to this case)
         if fields:
             qs = qs.select_related(*fields)
+
+        # select_for_update doesn't support select_related on nullable field at least for PostgreSQL
+        # select fields are checked and removed if they're nullable to prevent errors
+        if qs.select_for_update and not isinstance(qs.query.select_related, bool):
+            def _filter_nullable_fields(model, field_dict):
+                new_dict = dict()
+                for key, value in field_dict.iteritems():
+                    field = model._meta.get_field(key)
+                    if not field.null:
+                        new_dict[key] = _filter_nullable_fields(field.related_model, value)
+                return new_dict
+
+            qs.query.select_related = _filter_nullable_fields(qs.model, qs.query.select_related)
 
         return qs
 
