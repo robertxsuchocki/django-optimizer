@@ -5,11 +5,11 @@ which delays db saves and tries to perform them later in bulk operations
 """
 import copy
 
-from django.db import DEFAULT_DB_ALIAS, models, router, transaction
+from django.db import DEFAULT_DB_ALIAS, transaction
+from django.db.transaction import get_connection
 from django.utils.functional import partition
 from django_bulk_update.helper import bulk_update
 
-from django_optimizer.query import DeferredQuerySet
 from django_optimizer.registry import model_registry
 
 
@@ -74,42 +74,15 @@ class DeferredAtomic(transaction.Atomic):
 
     All db operations are done on atomic exit (for now)
     """
-    @staticmethod
-    def _deferred_save(obj, **kwargs):
-        def _get_signal_params(obj, **kwargs):
-            return {
-                'sender': obj.__class__,
-                'instance': obj,
-                'created': obj._state.adding,
-                'update_fields': kwargs.get('update_fields'),
-                'raw': kwargs.get('raw', False),
-                'using': kwargs.get('using', router.db_for_write(obj.__class__, instance=obj))
-            }
-        if not isinstance(obj._meta.model.objects.none(), DeferredQuerySet):
-            obj._default_save(**kwargs)
-        else:
-            models.signals.pre_save.send(**_get_signal_params(obj, **kwargs))
-            model_registry.add(get_db_instance(obj))
-            setattr(obj, obj._meta.pk.attname, DeferredPK(obj))
-            models.signals.post_save.send(**_get_signal_params(obj, **kwargs))
-
-    @classmethod
-    def _replace_save_method(cls):
-        models.Model._default_save = models.Model.save
-        models.Model.save = cls._deferred_save
-
-    @classmethod
-    def _rollback_save_method(cls):
-        models.Model.save = models.Model._default_save
-        del models.Model._default_save
+    connection_attr_name = 'atomic_block_class'
 
     def __enter__(self):
-        self._replace_save_method()
+        setattr(get_connection(self.using), self.connection_attr_name,  self.__class__.__name__)
         super(DeferredAtomic, self).__enter__()
 
     def __exit__(self, exc_type, exc_value, traceback):
         super(DeferredAtomic, self).__exit__(exc_type, exc_value, traceback)
-        self._rollback_save_method()
+        delattr(get_connection(self.using), self.connection_attr_name)
         perform_deferred_db_queries()
 
 
