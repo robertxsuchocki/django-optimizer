@@ -106,7 +106,7 @@ class Registry(object):
         """
         key = str(key)
         value = self.get(key)
-        if value == self.initial_value:
+        if key not in self.get_keys():
             self.add_key(key)
         value = modifier(value)
         self.cache.set(key, value)
@@ -240,6 +240,25 @@ class ModelRegistry(Registry):
         self.set(
             self.get_key_from_model(obj._meta.model),
             lambda x: list(filter_out(1, same_dict_with(obj), x))
+        )
+
+    def delete_by_ref(self, model, obj_id):
+        self.set(
+            self.get_key_from_model(model),
+            lambda x: list(filter(lambda o: o._deferred_obj != obj_id, x))
+        )
+
+    def remove_refs(self, model, obj_id):
+        def _clear_ref(ref):
+            def inner(obj):
+                if obj._deferred_obj == ref:
+                    obj._deferred_obj = None
+                return obj
+            return inner
+
+        self.set(
+            self.get_key_from_model(model),
+            lambda x: list(map(_clear_ref(obj_id), x))
         )
 
     def pop_pair(self, key):

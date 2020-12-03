@@ -13,20 +13,27 @@ from django_bulk_update.helper import bulk_update
 from django_optimizer.registry import model_registry
 
 
-def get_db_instance(obj, *args):
-    obj = copy.copy(obj)
+def get_db_instance(obj, with_ref=False, *args):
+    instance = copy.copy(obj)
     for attr in ('_queryset', 'instance_getattribute', 'refresh_from_db') + args:
-        obj.__dict__.pop(attr, None)
-    return obj
+        instance.__dict__.pop(attr, None)
+    if with_ref:
+        instance._deferred_obj = id(obj)
+    return instance
 
 
-def perform_deferred_db_queries(model=None):
-    key = model_registry.get_key_from_model(model)
+def perform_deferred_db_queries(only_model=None):
+    def _without_ids(iterable):
+        for i in iterable:
+            i.id = None
+            yield i
+
+    key = model_registry.get_key_from_model(only_model)
     if not key or model_registry.has_key(key):
         pairs = model_registry.pop_pair(key) if key else model_registry.pop_all()
         for model, objects in pairs:
             to_update, to_create = partition(lambda obj: obj._state.adding, objects)
-            model.objects.bulk_create(to_create)
+            model.objects.bulk_create(_without_ids(to_create))
             bulk_update(to_update)
 
 
