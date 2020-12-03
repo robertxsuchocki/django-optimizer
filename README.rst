@@ -42,5 +42,14 @@ Quick start
     class CustomQuerySet(models.query.QuerySet, OptimizerQuerySet):
         (...)
 
+5. In the end in order to take advantage of save deferring, DeferredModel has to be used in model definition::
+
+    from django_optimizer.models import DeferredModel
+
+
+    class CustomModel(DeferredModel):
+        objects = CustomQuerySet.as_manager()
+        (...)
+
 
 
