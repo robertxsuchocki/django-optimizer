@@ -9,6 +9,7 @@ import ast
 import copy
 import csv
 
+from django.conf import settings as django_settings
 from django.forms.models import model_to_dict
 from django.utils.module_loading import import_string
 
@@ -203,6 +204,44 @@ class FieldRegistry(Registry):
         return [key, list(value[0]), list(value[1]), list(value[2])]
 
 
+class CodeRegistry(Registry):
+    """
+    CodeRegistry used to hold source code annotations
+    """
+
+    def __init__(self):
+        super(CodeRegistry, self).__init__(
+            cache_settings=settings.DJANGO_OPTIMIZER_CODE_REGISTRY,
+            initial_value='',
+            key_list_id='__code_registry_key_set'
+        )
+
+    def add(self, qs_location, value):
+        """
+        Overwrites value in cache
+
+        :param qs_location: queryset's ObjectLocation object defining cache key
+        :param value: value to be inserted
+        """
+        self.set(qs_location, lambda x: value)
+
+    def apply_to_code(self):
+        """
+        Applies saved optimizations to source code, adding code that results in optimization of queries
+        """
+        for key in sorted(self.get_keys()):
+            if '::' in key:
+                file_path, name, number = key.split('::')
+                index = int(number) - 1
+                with open('{}/{}'.format(django_settings.BASE_DIR, file_path), mode='r+') as code_file:
+                    contents = code_file.readlines()
+                    contents[index] = '{line}  # django_optimizer ({name}): {value}\n'.format(
+                        line=contents[index][:-1], name=name, value=self.get(key)
+                    )
+                    code_file.seek(0)
+                    code_file.writelines(contents)
+
+
 class ModelRegistry(Registry):
     def __init__(self):
         super(ModelRegistry, self).__init__(
@@ -274,4 +313,5 @@ class ModelRegistry(Registry):
 
 
 field_registry = FieldRegistry()
+code_registry = CodeRegistry()
 model_registry = ModelRegistry()

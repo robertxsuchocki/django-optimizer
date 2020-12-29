@@ -6,8 +6,9 @@ import types
 
 from django.core.exceptions import FieldDoesNotExist
 from django.db import models
+from django_optimizer.registry import field_registry
 
-from django_optimizer.iterables import LoggingModelIterable
+from django_optimizer.conf import settings
 from django_optimizer.location import ObjectLocation
 from django_optimizer.query import SelectiveQuerySet
 
@@ -27,9 +28,13 @@ def selective_query_set_wrapper(model):
             (SelectiveQuerySet, type(queryset)),
             {}
         )
-        # __init__ instructions have to be run explicitly
-        queryset._location = ObjectLocation(queryset.model.__name__)
-        queryset._iterable_class = LoggingModelIterable
+
+        # __init__() instructions have to be run explicitly
+        queryset._live_optimization = settings.DJANGO_OPTIMIZER_LIVE_OPTIMIZATION
+        queryset._offsite_optimization = settings.DJANGO_OPTIMIZER_OFFSITE_OPTIMIZATION
+        queryset._location = ObjectLocation(queryset.model.__name__, queryset._offsite_optimization)
+        queryset._registry_fields = field_registry.get(queryset._location)
+        queryset._without_only = not queryset._registry_fields[field_registry.ONLY]
 
     return queryset
 

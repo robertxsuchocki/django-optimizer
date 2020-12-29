@@ -9,7 +9,22 @@ from django.db.models.query import ModelIterable
 from django_optimizer.conf import settings
 from django_optimizer.iterables import LoggingModelIterable, LoggingValuesIterable, LoggingValuesListIterable
 from django_optimizer.location import ObjectLocation
-from django_optimizer.registry import field_registry
+from django_optimizer.registry import field_registry, code_registry
+
+
+class LoggingPrefetch(Prefetch):
+    """
+    Prefetch object, which was defined as a workaround: Django source code checks parameter _iterable_class for equality
+    with class ModelIterable to determine whether .values() was used or not (raising an exception if needed).
+
+    LoggingPrefetch replaces LoggingModelIterable with ModelIterable before __init__() (so no exceptions are raised)
+    and reverts this change later
+    """
+    def __init__(self, lookup, queryset=None, to_attr=None):
+        if queryset._iterable_class == LoggingModelIterable:
+            queryset._iterable_class = ModelIterable
+        super(LoggingPrefetch, self).__init__(lookup, queryset, to_attr)
+        queryset._iterable_class = LoggingModelIterable
 
 
 class SelectiveQuerySet(models.query.QuerySet):
@@ -25,8 +40,9 @@ class SelectiveQuerySet(models.query.QuerySet):
         Remembers its location, which is set in __init__() function of ObjectLocation class
         """
         super(SelectiveQuerySet, self).__init__(*args, **kwargs)
-        self._enabled = not settings.DJANGO_OPTIMIZER_DISABLE_OPTIMIZATION
-        self._location = ObjectLocation(self.model.__name__)
+        self._live_optimization = settings.DJANGO_OPTIMIZER_LIVE_OPTIMIZATION
+        self._offsite_optimization = settings.DJANGO_OPTIMIZER_OFFSITE_OPTIMIZATION
+        self._location = ObjectLocation(self.model.__name__, self._offsite_optimization)
         self._registry_fields = field_registry.get(self._location)
         self._without_only = not self._registry_fields[field_registry.ONLY]
 
@@ -68,14 +84,42 @@ class SelectiveQuerySet(models.query.QuerySet):
         Retrieves field sets from FieldRegistry, then appends qs with only(), select_related()
         and prefetch_related() operations based on registry values and then updates self accordingly
         """
-        # should be a noop if optimization is turned off or object is outside of QuerySet
+        # should be a noop if object is outside of QuerySet
         # in case of _fetch_all() _optimize() is expected to be called once, before self._result_cache field creation
         # in case of values(_list), _optimize() will be manually called before them and skipped later
-        if self._enabled and self._location and self._result_cache is None and self._fields is None:
+        if self._location and self._result_cache is None and self._fields is None:
+            if self._live_optimization:
+                qs = self._prepare_qs(*self._registry_fields)
+                self.__dict__.update(qs.__dict__)
+                if self._offsite_optimization:
+                    self._log_qs()
+
             if self._iterable_class is ModelIterable:
                 self._iterable_class = LoggingModelIterable
-            qs = self._prepare_qs(*self._registry_fields)
-            self.__dict__.update(qs.__dict__)
+
+    def _log_qs(self):
+        """
+        Uses _prepare_qs to generate code, that can be used to make the same optimizations in source code
+
+        :return: string containing generated code containing optimizations
+        """
+        def _prefetch_objects_string_repr(prefetch):
+            return "Prefetch('{field}')".format(field=prefetch.prefetch_through, qs='')
+
+        def _get_listed_args(iterable):
+            def _get_arg_repr(obj):
+                if isinstance(obj, str):
+                    return "'{}'".format(obj)
+                elif isinstance(obj, Prefetch):
+                    return _prefetch_objects_string_repr(obj)
+            return ', '.join(map(_get_arg_repr, iterable))
+
+        value = ".select_related({select}).prefetch_related({prefetch}).only({only})".format(
+            select=_get_listed_args(self.query.select_related or []),
+            prefetch=_get_listed_args(self._prefetch_related_lookups),
+            only=_get_listed_args(self.query.deferred_loading[0]),
+        )
+        code_registry.add(self._location, value)
 
     def _prepare_qs(self, select, prefetch, only):
         """
@@ -134,7 +178,7 @@ class SelectiveQuerySet(models.query.QuerySet):
                 field = self.model._meta.get_field(label)
                 model = field.model if self.model != field.model else field.related_model
                 queryset = selective_query_set_wrapper(model)
-                prefetch_obj = Prefetch(field.name, queryset=queryset)
+                prefetch_obj = LoggingPrefetch(field.name, queryset=queryset)
                 qs = qs.prefetch_related(prefetch_obj)
 
         return qs

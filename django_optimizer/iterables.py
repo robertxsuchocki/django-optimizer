@@ -19,7 +19,7 @@ class LoggingIterable(object):
         from django_optimizer.wrappers import logging_model_wrapper
 
         for obj in super(LoggingIterable, self).__iter__():
-            if settings.DJANGO_OPTIMIZER_DISABLE_LOGGING:
+            if not settings.DJANGO_OPTIMIZER_LOGGING:
                 yield obj
             else:
                 try:
