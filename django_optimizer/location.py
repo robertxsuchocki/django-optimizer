@@ -17,6 +17,7 @@ class ObjectLocation(object):
         and passed name to differentiate between different objects
 
         :param name: string indicating a type or name for a located object
+        :param with_number: whether line number should be considered or not
         """
         self.source = self.get_source()
         if self.source:

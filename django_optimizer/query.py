@@ -103,23 +103,33 @@ class SelectiveQuerySet(models.query.QuerySet):
 
         :return: string containing generated code containing optimizations
         """
-        def _prefetch_objects_string_repr(prefetch):
-            return "Prefetch('{field}')".format(field=prefetch.prefetch_through, qs='')
-
         def _get_listed_args(iterable):
             def _get_arg_repr(obj):
                 if isinstance(obj, str):
                     return "'{}'".format(obj)
                 elif isinstance(obj, Prefetch):
-                    return _prefetch_objects_string_repr(obj)
+                    return _prefetch_string_repr(obj)
             return ', '.join(map(_get_arg_repr, iterable))
 
-        value = ".select_related({select}).prefetch_related({prefetch}).only({only})".format(
-            select=_get_listed_args(self.query.select_related or []),
-            prefetch=_get_listed_args(self._prefetch_related_lookups),
-            only=_get_listed_args(self.query.deferred_loading[0]),
-        )
-        code_registry.add(self._location, value)
+        def _queryset_string_repr(queryset):
+            def _function_application(function_name, args):
+                return '.{}({})'.format(function_name, _get_listed_args(args)) if args else ''
+
+            select_code = _function_application('select_related', queryset.query.select_related or [])
+            prefetch_code = _function_application('prefetch_related', queryset._prefetch_related_lookups)
+            only_code = _function_application('only', queryset.query.deferred_loading[0])
+
+            return select_code + prefetch_code + only_code
+
+        def _prefetch_string_repr(prefetch):
+            prefetch.queryset._optimize()
+            return "Prefetch('{field}', queryset={model}.objects.all(){queryset})".format(
+                field=prefetch.prefetch_through,
+                model=prefetch.queryset.model.__name__,
+                queryset=_queryset_string_repr(prefetch.queryset),
+            )
+
+        code_registry.add(self._location, _queryset_string_repr(self))
 
     def _prepare_qs(self, select, prefetch, only):
         """
